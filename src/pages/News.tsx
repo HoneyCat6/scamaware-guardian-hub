@@ -1,8 +1,9 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
@@ -46,6 +47,7 @@ const mockArticles: Article[] = [
 
 const News = () => {
   const [articles, setArticles] = useState<Article[]>(mockArticles);
+  const [searchQuery, setSearchQuery] = useState("");
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -58,6 +60,16 @@ const News = () => {
       description: "The article has been successfully removed.",
     });
   };
+
+  const filteredArticles = articles.filter(article => {
+    const query = searchQuery.toLowerCase();
+    return (
+      article.title.toLowerCase().includes(query) ||
+      article.content.toLowerCase().includes(query) ||
+      article.excerpt.toLowerCase().includes(query) ||
+      article.author.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -80,8 +92,27 @@ const News = () => {
           )}
         </div>
 
+        {/* Search Bar */}
+        <div className="mb-8">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              type="text"
+              placeholder="Search articles..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {searchQuery && (
+            <p className="text-sm text-gray-600 mt-2">
+              Found {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''} matching "{searchQuery}"
+            </p>
+          )}
+        </div>
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {articles.map((article) => (
+          {filteredArticles.map((article) => (
             <div key={article.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
@@ -126,10 +157,17 @@ const News = () => {
           ))}
         </div>
 
-        {articles.length === 0 && (
+        {filteredArticles.length === 0 && !searchQuery && (
           <div className="text-center py-12">
             <h3 className="text-xl font-semibold text-gray-600 mb-2">No articles yet</h3>
             <p className="text-gray-500">Check back soon for the latest scam alerts and news.</p>
+          </div>
+        )}
+
+        {filteredArticles.length === 0 && searchQuery && (
+          <div className="text-center py-12">
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No articles found</h3>
+            <p className="text-gray-500">No articles match your search query "{searchQuery}". Try different keywords.</p>
           </div>
         )}
       </div>
