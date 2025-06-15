@@ -9,6 +9,9 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import News from "./pages/News";
+import Article from "./pages/Article";
+import CreateArticle from "./pages/CreateArticle";
+import EditArticle from "./pages/EditArticle";
 import Forums from "./pages/Forums";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
@@ -27,6 +30,9 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/news" element={<News />} />
+            <Route path="/article/:id" element={<Article />} />
+            <Route path="/create-article" element={<CreateArticle />} />
+            <Route path="/edit-article/:id" element={<EditArticle />} />
             <Route path="/forums" element={<Forums />} />
             <Route path="/admin" element={<AdminPanel />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
