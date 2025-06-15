@@ -1,9 +1,9 @@
-
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ForumStats from "@/components/ForumStats";
@@ -58,6 +58,7 @@ const Forums = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'recent'>('categories');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,15 +82,27 @@ const Forums = () => {
   const totalThreads = categorizedThreads.length;
   const totalPosts = categorizedThreads.reduce((total, thread) => total + thread.posts.length, 0);
 
-  // Filter threads by selected category
+  // Filter threads by selected category and search query
   const allFilteredThreads = useMemo(() => {
-    return selectedCategory 
+    let threads = selectedCategory 
       ? categorizedThreads.filter(thread => {
           const category = updatedCategories.find(cat => cat.id === selectedCategory);
           return category && thread.category === category.name;
         })
-      : categorizedThreads.sort((a, b) => b.id - a.id); // Sort by newest first
-  }, [selectedCategory, categorizedThreads, updatedCategories]);
+      : categorizedThreads.sort((a, b) => b.id - a.id);
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      threads = threads.filter(thread => 
+        thread.title.toLowerCase().includes(query) ||
+        thread.content.toLowerCase().includes(query) ||
+        thread.author.toLowerCase().includes(query)
+      );
+    }
+
+    return threads;
+  }, [selectedCategory, searchQuery, categorizedThreads, updatedCategories]);
 
   // Pagination setup
   const THREADS_PER_PAGE = 10;
@@ -117,6 +130,7 @@ const Forums = () => {
       setIsLoading(true);
       setError(null);
       setSelectedCategory(null);
+      setSearchQuery("");
       setActiveTab(tab);
       resetPagination();
       setTimeout(() => setIsLoading(false), 200);
@@ -131,6 +145,7 @@ const Forums = () => {
       setIsLoading(true);
       setError(null);
       setSelectedCategory(categoryId);
+      setSearchQuery("");
       setActiveTab('recent');
       resetPagination();
       setTimeout(() => setIsLoading(false), 300);
@@ -142,6 +157,7 @@ const Forums = () => {
 
   const handleClearCategory = () => {
     setSelectedCategory(null);
+    setSearchQuery("");
     setActiveTab('categories');
     resetPagination();
   };
@@ -224,6 +240,27 @@ const Forums = () => {
             onTabChange={handleTabChange}
             onClearCategory={handleClearCategory}
           />
+
+          {/* Search Bar - Only show in recent threads view */}
+          {activeTab === 'recent' && (
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search threads..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              {searchQuery && (
+                <p className="text-sm text-gray-600 mt-2">
+                  Found {allFilteredThreads.length} thread{allFilteredThreads.length !== 1 ? 's' : ''} matching "{searchQuery}"
+                </p>
+              )}
+            </div>
+          )}
 
           {isLoading ? (
             <div className="text-center py-12">
