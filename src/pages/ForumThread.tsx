@@ -28,7 +28,11 @@ const ForumThread = () => {
 
   // Convert string id to number and safely access threadData
   const threadId = id ? parseInt(id, 10) : null;
-  const thread = threadId && threadData[threadId as keyof typeof threadData] ? threadData[threadId as keyof typeof threadData] : null;
+  const [currentThread, setCurrentThread] = useState(
+    threadId && threadData[threadId as keyof typeof threadData] 
+      ? threadData[threadId as keyof typeof threadData] 
+      : null
+  );
 
   const canModerate = user && (user.role === 'moderator' || user.role === 'admin');
 
@@ -49,13 +53,21 @@ const ForumThread = () => {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      // Remove the post from the current thread
+      if (currentThread) {
+        const updatedThread = {
+          ...currentThread,
+          posts: currentThread.posts.filter(post => post.id !== postId)
+        };
+        setCurrentThread(updatedThread);
+      }
+      
       toast({
         title: "Post deleted",
         description: "The post has been successfully removed.",
       });
       
-      // In a real app, you would update the thread data here
-      console.log(`Deleting post ${postId}`);
+      console.log(`Deleted post ${postId}`);
     } catch (err) {
       const errorMessage = "Failed to delete post. Please try again.";
       setError(errorMessage);
@@ -82,7 +94,7 @@ const ForumThread = () => {
       throw new Error("You must be logged in to post replies.");
     }
 
-    if (!thread) {
+    if (!currentThread) {
       throw new Error("Thread not found.");
     }
 
@@ -93,8 +105,26 @@ const ForumThread = () => {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // In a real app, you would add the new post to the thread data
-      console.log(`Adding reply to thread ${thread.id}:`, content);
+      // Create new post object
+      const newPost = {
+        id: Math.max(...currentThread.posts.map(p => p.id)) + 1,
+        author: user.username,
+        content: content,
+        createdAt: "Just now",
+        likes: 0,
+        isReported: false,
+        reportCount: 0
+      };
+      
+      // Add the new post to the thread
+      const updatedThread = {
+        ...currentThread,
+        posts: [...currentThread.posts, newPost]
+      };
+      
+      setCurrentThread(updatedThread);
+      
+      console.log(`Adding reply to thread ${currentThread.id}:`, content);
       
       // Simulate success
       return Promise.resolve();
@@ -111,7 +141,7 @@ const ForumThread = () => {
     return <InvalidThreadId />;
   }
 
-  if (!thread) {
+  if (!currentThread) {
     return <ThreadNotFound />;
   }
 
@@ -152,14 +182,14 @@ const ForumThread = () => {
           )}
 
           {/* Thread Header */}
-          <ThreadHeader thread={thread} />
+          <ThreadHeader thread={currentThread} />
 
           {/* Loading Overlay */}
           {isLoading && <ThreadLoadingOverlay />}
 
           {/* Posts */}
           <div className="space-y-4 mb-8">
-            {thread.posts.map((post) => (
+            {currentThread.posts.map((post) => (
               <ThreadPost 
                 key={post.id} 
                 post={post}
