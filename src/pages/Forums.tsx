@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import CategoryList from "@/components/CategoryList";
 import ThreadList from "@/components/ThreadList";
 import ForumNavigation from "@/components/ForumNavigation";
 import { useAuth } from "@/hooks/useAuth";
+import { usePagination } from "@/hooks/usePagination";
 import { threadData } from "@/data/threadData";
 
 // Forum categories with better organization
@@ -80,12 +81,44 @@ const Forums = () => {
   const totalThreads = categorizedThreads.length;
   const totalPosts = categorizedThreads.reduce((total, thread) => total + thread.posts.length, 0);
 
+  // Filter threads by selected category
+  const allFilteredThreads = useMemo(() => {
+    return selectedCategory 
+      ? categorizedThreads.filter(thread => {
+          const category = updatedCategories.find(cat => cat.id === selectedCategory);
+          return category && thread.category === category.name;
+        })
+      : categorizedThreads.sort((a, b) => b.id - a.id); // Sort by newest first
+  }, [selectedCategory, categorizedThreads, updatedCategories]);
+
+  // Pagination setup
+  const THREADS_PER_PAGE = 10;
+  const {
+    startIndex,
+    endIndex,
+    currentPage,
+    totalPages,
+    canGoNext,
+    canGoPrevious,
+    goToNext,
+    goToPrevious,
+    goToPage,
+    reset: resetPagination
+  } = usePagination({
+    totalItems: allFilteredThreads.length,
+    itemsPerPage: THREADS_PER_PAGE
+  });
+
+  // Get current page threads
+  const paginatedThreads = allFilteredThreads.slice(startIndex, endIndex);
+
   const handleTabChange = (tab: 'categories' | 'recent') => {
     try {
       setIsLoading(true);
       setError(null);
       setSelectedCategory(null);
       setActiveTab(tab);
+      resetPagination();
       setTimeout(() => setIsLoading(false), 200);
     } catch (err) {
       setError('Failed to load forum data');
@@ -99,6 +132,7 @@ const Forums = () => {
       setError(null);
       setSelectedCategory(categoryId);
       setActiveTab('recent');
+      resetPagination();
       setTimeout(() => setIsLoading(false), 300);
     } catch (err) {
       setError('Failed to load category threads');
@@ -109,19 +143,12 @@ const Forums = () => {
   const handleClearCategory = () => {
     setSelectedCategory(null);
     setActiveTab('categories');
+    resetPagination();
   };
 
   const handleClearError = () => {
     setError(null);
   };
-
-  // Filter threads by selected category
-  const filteredThreads = selectedCategory 
-    ? categorizedThreads.filter(thread => {
-        const category = updatedCategories.find(cat => cat.id === selectedCategory);
-        return category && thread.category === category.name;
-      })
-    : categorizedThreads.sort((a, b) => b.id - a.id); // Sort by newest first
 
   const getSelectedCategoryName = () => {
     if (!selectedCategory) return null;
@@ -216,12 +243,19 @@ const Forums = () => {
               {/* Recent Threads View */}
               {activeTab === 'recent' && (
                 <ThreadList 
-                  threads={filteredThreads}
+                  threads={paginatedThreads}
                   selectedCategory={selectedCategory}
                   selectedCategoryName={getSelectedCategoryName()}
                   canCreateThreads={canCreateThreads}
                   canModerate={canModerate}
                   formatTimeAgo={formatTimeAgo}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  canGoNext={canGoNext}
+                  canGoPrevious={canGoPrevious}
+                  onNextPage={goToNext}
+                  onPreviousPage={goToPrevious}
+                  onGoToPage={goToPage}
                 />
               )}
             </>

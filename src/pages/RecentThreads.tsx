@@ -1,13 +1,22 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { MessageSquare, Users, Clock, Plus, ArrowRight, User, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
+import { usePagination } from "@/hooks/usePagination";
 
 // Mock recent threads data
 const recentThreads = [
@@ -93,6 +102,108 @@ const RecentThreads = () => {
   const canCreateThreads = Boolean(user);
   const canModerate = user && (user.role === 'moderator' || user.role === 'admin');
 
+  // Pagination setup
+  const THREADS_PER_PAGE = 8;
+  const {
+    startIndex,
+    endIndex,
+    currentPage,
+    totalPages,
+    canGoNext,
+    canGoPrevious,
+    goToNext,
+    goToPrevious,
+    goToPage
+  } = usePagination({
+    totalItems: recentThreads.length,
+    itemsPerPage: THREADS_PER_PAGE
+  });
+
+  // Get current page threads
+  const paginatedThreads = recentThreads.slice(startIndex, endIndex);
+
+  const renderPaginationItems = () => {
+    const items = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        items.push(
+          <PaginationItem key={i}>
+            <PaginationLink
+              onClick={() => goToPage(i)}
+              isActive={currentPage === i}
+              className="cursor-pointer"
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        );
+      }
+    } else {
+      items.push(
+        <PaginationItem key={1}>
+          <PaginationLink
+            onClick={() => goToPage(1)}
+            isActive={currentPage === 1}
+            className="cursor-pointer"
+          >
+            1
+          </PaginationLink>
+        </PaginationItem>
+      );
+
+      if (currentPage > 3) {
+        items.push(
+          <PaginationItem key="ellipsis1">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+      }
+
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      
+      for (let i = start; i <= end; i++) {
+        items.push(
+          <PaginationItem key={i}>
+            <PaginationLink
+              onClick={() => goToPage(i)}
+              isActive={currentPage === i}
+              className="cursor-pointer"
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        );
+      }
+
+      if (currentPage < totalPages - 2) {
+        items.push(
+          <PaginationItem key="ellipsis2">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+      }
+
+      if (totalPages > 1) {
+        items.push(
+          <PaginationItem key={totalPages}>
+            <PaginationLink
+              onClick={() => goToPage(totalPages)}
+              isActive={currentPage === totalPages}
+              className="cursor-pointer"
+            >
+              {totalPages}
+            </PaginationLink>
+          </PaginationItem>
+        );
+      }
+    }
+
+    return items;
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -129,6 +240,9 @@ const RecentThreads = () => {
             <h1 className="text-3xl font-bold text-gray-900 mb-4">Recent Threads</h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Stay up to date with the latest discussions and alerts from our community.
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Page {currentPage} of {totalPages} • Showing {paginatedThreads.length} of {recentThreads.length} threads
             </p>
             {canModerate && (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
@@ -192,57 +306,84 @@ const RecentThreads = () => {
               <p className="mt-4 text-gray-600">Loading recent threads...</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {recentThreads.map((thread) => (
-                <Card key={thread.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          {thread.isPinned && (
-                            <Badge variant="secondary" className="text-xs">
-                              Pinned
+            <>
+              <div className="space-y-4 mb-8">
+                {paginatedThreads.map((thread) => (
+                  <Card key={thread.id} className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            {thread.isPinned && (
+                              <Badge variant="secondary" className="text-xs">
+                                Pinned
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              {thread.category}
                             </Badge>
-                          )}
-                          <Badge variant="outline" className="text-xs">
-                            {thread.category}
-                          </Badge>
-                          {canModerate && (
-                            <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700">
-                              Mod Tools
-                            </Badge>
-                          )}
+                            {canModerate && (
+                              <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700">
+                                Mod Tools
+                              </Badge>
+                            )}
+                          </div>
+                          <Link to={`/forums/thread/${thread.id}`}>
+                            <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
+                              {thread.title}
+                            </h3>
+                          </Link>
+                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <User className="w-4 h-4" />
+                              <span>{thread.author}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <MessageSquare className="w-4 h-4" />
+                              <span>{thread.replies} replies</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{thread.lastPost}</span>
+                            </div>
+                          </div>
                         </div>
                         <Link to={`/forums/thread/${thread.id}`}>
-                          <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
-                            {thread.title}
-                          </h3>
+                          <Button variant="ghost" size="sm">
+                            <ArrowRight className="w-4 h-4" />
+                          </Button>
                         </Link>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            <span>{thread.author}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MessageSquare className="w-4 h-4" />
-                            <span>{thread.replies} replies</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{thread.lastPost}</span>
-                          </div>
-                        </div>
                       </div>
-                      <Link to={`/forums/thread/${thread.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex justify-center mb-8">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={goToPrevious}
+                          className={`cursor-pointer ${!canGoPrevious ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        />
+                      </PaginationItem>
+                      
+                      {renderPaginationItems()}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={goToNext}
+                          className={`cursor-pointer ${!canGoNext ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
           )}
 
           {/* Login Prompt for Guests */}
