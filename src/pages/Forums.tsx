@@ -96,6 +96,7 @@ const recentThreads = [
 const Forums = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'recent'>('categories');
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,6 +109,7 @@ const Forums = () => {
     try {
       setIsLoading(true);
       setError(null);
+      setSelectedCategory(null); // Reset category selection when switching tabs
       setActiveTab(tab);
       // Simulate loading time
       setTimeout(() => setIsLoading(false), 200);
@@ -115,6 +117,34 @@ const Forums = () => {
       setError('Failed to load forum data');
       setIsLoading(false);
     }
+  };
+
+  const handleCategorySelect = (categoryId: number) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setSelectedCategory(categoryId);
+      setActiveTab('recent'); // Switch to recent view when category is selected
+      // Simulate loading time
+      setTimeout(() => setIsLoading(false), 300);
+    } catch (err) {
+      setError('Failed to load category threads');
+      setIsLoading(false);
+    }
+  };
+
+  // Filter threads by selected category
+  const filteredThreads = selectedCategory 
+    ? recentThreads.filter(thread => {
+        const category = forumCategories.find(cat => cat.id === selectedCategory);
+        return category && thread.category === category.name;
+      })
+    : recentThreads;
+
+  const getSelectedCategoryName = () => {
+    if (!selectedCategory) return null;
+    const category = forumCategories.find(cat => cat.id === selectedCategory);
+    return category?.name;
   };
 
   if (error) {
@@ -193,8 +223,20 @@ const Forums = () => {
                 onClick={() => handleTabChange('recent')}
                 disabled={isLoading}
               >
-                Recent Threads
+                {selectedCategory ? `${getSelectedCategoryName()} Threads` : 'Recent Threads'}
               </Button>
+              {selectedCategory && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setActiveTab('categories');
+                  }}
+                  disabled={isLoading}
+                >
+                  Back to All Categories
+                </Button>
+              )}
             </div>
             {canCreateThreads && (
               <Link to="/forums/create-thread">
@@ -217,10 +259,10 @@ const Forums = () => {
               {activeTab === 'categories' && (
                 <div className="space-y-4">
                   {forumCategories.map((category) => (
-                    <Card key={category.id} className="hover:shadow-lg transition-shadow">
+                    <Card key={category.id} className="hover:shadow-lg transition-shadow cursor-pointer">
                       <CardContent className="p-6">
                         <div className="flex items-center justify-between">
-                          <div className="flex-1">
+                          <div className="flex-1" onClick={() => handleCategorySelect(category.id)}>
                             <div className="flex items-center gap-3 mb-2">
                               <div className={`w-3 h-3 rounded-full ${category.color.split(' ')[0]}`}></div>
                               <h3 className="text-xl font-semibold text-gray-900">{category.name}</h3>
@@ -232,11 +274,17 @@ const Forums = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Link to={`/forums/recent`}>
-                              <Button variant="ghost" size="sm" title="View recent threads in this category">
-                                <ArrowRight className="w-4 h-4" />
-                              </Button>
-                            </Link>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCategorySelect(category.id);
+                              }}
+                              title={`View threads in ${category.name}`}
+                            >
+                              <ArrowRight className="w-4 h-4" />
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
@@ -248,55 +296,85 @@ const Forums = () => {
               {/* Recent Threads */}
               {activeTab === 'recent' && (
                 <div className="space-y-4">
-                  {recentThreads.map((thread) => (
-                    <Card key={thread.id} className="hover:shadow-lg transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              {thread.isPinned && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Pinned
-                                </Badge>
-                              )}
-                              <Badge variant="outline" className="text-xs">
-                                {thread.category}
-                              </Badge>
-                              {canModerate && (
-                                <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700">
-                                  Mod Tools
-                                </Badge>
-                              )}
-                            </div>
-                            <Link to={`/forums/thread/${thread.id}`}>
-                              <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
-                                {thread.title}
-                              </h3>
-                            </Link>
-                            <div className="flex items-center gap-4 text-sm text-gray-500">
-                              <div className="flex items-center gap-1">
-                                <User className="w-4 h-4" />
-                                <span>{thread.author}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <MessageSquare className="w-4 h-4" />
-                                <span>{thread.replies} replies</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-4 h-4" />
-                                <span>{thread.lastPost}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <Link to={`/forums/thread/${thread.id}`}>
-                            <Button variant="ghost" size="sm">
-                              <ArrowRight className="w-4 h-4" />
-                            </Button>
+                  {selectedCategory && (
+                    <div className="mb-4">
+                      <h2 className="text-xl font-semibold text-gray-900">
+                        {getSelectedCategoryName()} - Recent Threads
+                      </h2>
+                      <p className="text-gray-600">
+                        Showing threads from the {getSelectedCategoryName()} category
+                      </p>
+                    </div>
+                  )}
+                  {filteredThreads.length === 0 ? (
+                    <Card>
+                      <CardContent className="p-8 text-center">
+                        <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Threads Found</h3>
+                        <p className="text-gray-600 mb-4">
+                          {selectedCategory 
+                            ? `No threads found in the ${getSelectedCategoryName()} category.`
+                            : 'No recent threads available at the moment.'
+                          }
+                        </p>
+                        {canCreateThreads && (
+                          <Link to="/forums/create-thread">
+                            <Button>Create First Thread</Button>
                           </Link>
-                        </div>
+                        )}
                       </CardContent>
                     </Card>
-                  ))}
+                  ) : (
+                    filteredThreads.map((thread) => (
+                      <Card key={thread.id} className="hover:shadow-lg transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                {thread.isPinned && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Pinned
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-xs">
+                                  {thread.category}
+                                </Badge>
+                                {canModerate && (
+                                  <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700">
+                                    Mod Tools
+                                  </Badge>
+                                )}
+                              </div>
+                              <Link to={`/forums/thread/${thread.id}`}>
+                                <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
+                                  {thread.title}
+                                </h3>
+                              </Link>
+                              <div className="flex items-center gap-4 text-sm text-gray-500">
+                                <div className="flex items-center gap-1">
+                                  <User className="w-4 h-4" />
+                                  <span>{thread.author}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <MessageSquare className="w-4 h-4" />
+                                  <span>{thread.replies} replies</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{thread.lastPost}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <Link to={`/forums/thread/${thread.id}`}>
+                              <Button variant="ghost" size="sm">
+                                <ArrowRight className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
                 </div>
               )}
             </>
