@@ -13,6 +13,7 @@ import Article from "./pages/Article";
 import CreateArticle from "./pages/CreateArticle";
 import EditArticle from "./pages/EditArticle";
 import Forums from "./pages/Forums";
+import RecentThreads from "./pages/RecentThreads";
 import ForumThread from "./pages/ForumThread";
 import CreateThread from "./pages/CreateThread";
 import AdminPanel from "./pages/AdminPanel";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/create-article" element={<CreateArticle />} />
             <Route path="/edit-article/:id" element={<EditArticle />} />
             <Route path="/forums" element={<Forums />} />
+            <Route path="/forums/recent" element={<RecentThreads />} />
             <Route path="/forums/thread/:id" element={<ForumThread />} />
             <Route path="/forums/create-thread" element={<CreateThread />} />
             <Route path="/admin" element={<AdminPanel />} />
