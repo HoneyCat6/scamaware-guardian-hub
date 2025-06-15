@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, MessageSquare, User, Clock, ThumbsUp, Flag, Reply } from "lucide-react";
@@ -54,7 +53,9 @@ const ForumThread = () => {
   const [newPost, setNewPost] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const thread = threadData[id as keyof typeof threadData];
+  // Convert string id to number and safely access threadData
+  const threadId = id ? parseInt(id, 10) : null;
+  const thread = threadId && threadData[threadId as keyof typeof threadData] ? threadData[threadId as keyof typeof threadData] : null;
 
   const handleSubmitPost = async (e: React.FormEvent) => {
     e.preventDefault();
