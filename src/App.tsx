@@ -13,6 +13,8 @@ import Article from "./pages/Article";
 import CreateArticle from "./pages/CreateArticle";
 import EditArticle from "./pages/EditArticle";
 import Forums from "./pages/Forums";
+import ForumThread from "./pages/ForumThread";
+import CreateThread from "./pages/CreateThread";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +36,8 @@ const App = () => (
             <Route path="/create-article" element={<CreateArticle />} />
             <Route path="/edit-article/:id" element={<EditArticle />} />
             <Route path="/forums" element={<Forums />} />
+            <Route path="/forums/thread/:id" element={<ForumThread />} />
+            <Route path="/forums/create-thread" element={<CreateThread />} />
             <Route path="/admin" element={<AdminPanel />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

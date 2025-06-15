@@ -1,103 +1,267 @@
 
-import { MessageSquare, Users, Clock } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { MessageSquare, Users, Clock, Plus, ArrowRight, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/hooks/useAuth";
+
+// Mock forum data
+const forumCategories = [
+  {
+    id: 1,
+    name: "Scam Reports",
+    description: "Report and discuss new scams you've encountered",
+    threads: 45,
+    posts: 234,
+    color: "bg-red-100 text-red-600"
+  },
+  {
+    id: 2,
+    name: "Prevention Tips",
+    description: "Share and learn scam prevention strategies",
+    threads: 32,
+    posts: 186,
+    color: "bg-blue-100 text-blue-600"
+  },
+  {
+    id: 3,
+    name: "Support & Recovery",
+    description: "Support for scam victims and recovery advice",
+    threads: 28,
+    posts: 142,
+    color: "bg-green-100 text-green-600"
+  },
+  {
+    id: 4,
+    name: "General Discussion",
+    description: "General cybersecurity and safety discussions",
+    threads: 67,
+    posts: 398,
+    color: "bg-purple-100 text-purple-600"
+  }
+];
+
+const recentThreads = [
+  {
+    id: 1,
+    title: "New Bitcoin Investment Scam Alert",
+    author: "SafetyFirst",
+    replies: 23,
+    lastPost: "2 hours ago",
+    category: "Scam Reports",
+    isPinned: true
+  },
+  {
+    id: 2,
+    title: "How to identify fake tech support calls",
+    author: "TechExpert",
+    replies: 15,
+    lastPost: "4 hours ago",
+    category: "Prevention Tips",
+    isPinned: false
+  },
+  {
+    id: 3,
+    title: "Received suspicious email from 'bank'",
+    author: "NewUser123",
+    replies: 8,
+    lastPost: "6 hours ago",
+    category: "Scam Reports",
+    isPinned: false
+  },
+  {
+    id: 4,
+    title: "Recovery after falling for romance scam",
+    author: "StayStrong",
+    replies: 31,
+    lastPost: "8 hours ago",
+    category: "Support & Recovery",
+    isPinned: false
+  },
+  {
+    id: 5,
+    title: "Best practices for online shopping safety",
+    author: "SecureShop",
+    replies: 19,
+    lastPost: "1 day ago",
+    category: "Prevention Tips",
+    isPinned: false
+  }
+];
 
 const Forums = () => {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'categories' | 'recent'>('categories');
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Community Forums</h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Connect with others, share experiences, and learn from our community of scam-awareness advocates.
           </p>
         </div>
 
-        <div className="max-w-4xl mx-auto">
-          {/* Coming Soon Banner */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-8 rounded-lg shadow-lg mb-8">
-            <div className="text-center">
-              <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-80" />
-              <h2 className="text-2xl font-bold mb-4">Forums Coming Soon!</h2>
-              <p className="text-lg opacity-90 mb-6">
-                We're building an amazing community space where you can discuss scam prevention, share experiences, and help others stay safe online.
-              </p>
-              <div className="flex justify-center">
-                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 text-center">
-                  <Clock className="w-8 h-8 mx-auto mb-2" />
-                  <p className="font-semibold">Launching Soon</p>
-                  <p className="text-sm opacity-75">Stay tuned for updates!</p>
-                </div>
-              </div>
-            </div>
+        <div className="max-w-6xl mx-auto">
+          {/* Forum Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Users className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-gray-900">1,247</div>
+                <div className="text-sm text-gray-600">Active Members</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6 text-center">
+                <MessageSquare className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-gray-900">172</div>
+                <div className="text-sm text-gray-600">Total Threads</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Clock className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-gray-900">960</div>
+                <div className="text-sm text-gray-600">Total Posts</div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Planned Features */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                  <MessageSquare className="w-6 h-6 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">Discussion Threads</h3>
-              </div>
-              <p className="text-gray-600">
-                Share your experiences, ask questions, and discuss the latest scam trends with our community members.
-              </p>
+          {/* Action Bar */}
+          <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <div className="flex space-x-2">
+              <Button
+                variant={activeTab === 'categories' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('categories')}
+              >
+                Categories
+              </Button>
+              <Button
+                variant={activeTab === 'recent' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('recent')}
+              >
+                Recent Threads
+              </Button>
             </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
-                  <Users className="w-6 h-6 text-green-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">Expert Moderation</h3>
-              </div>
-              <p className="text-gray-600">
-                Our team of cybersecurity experts and moderators will ensure high-quality discussions and accurate information.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
-                  <MessageSquare className="w-6 h-6 text-purple-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">Scam Reports</h3>
-              </div>
-              <p className="text-gray-600">
-                Report new scams you've encountered and help warn others in the community about emerging threats.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-4">
-                  <Users className="w-6 h-6 text-yellow-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">Support Groups</h3>
-              </div>
-              <p className="text-gray-600">
-                Connect with others who have experienced scams and find support, advice, and resources for recovery.
-              </p>
-            </div>
+            {user && (
+              <Link to="/forums/create-thread">
+                <Button className="flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  New Thread
+                </Button>
+              </Link>
+            )}
           </div>
 
-          {/* Subscribe for Updates */}
-          <div className="bg-white p-8 rounded-lg shadow-lg mt-8 text-center">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">Want to be notified when forums launch?</h3>
-            <p className="text-gray-600 mb-6">
-              Create an account today and you'll be among the first to know when our community forums go live!
-            </p>
-            <div className="flex justify-center">
-              <a href="/register" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                Join ScamAware Today
-              </a>
+          {/* Forum Categories */}
+          {activeTab === 'categories' && (
+            <div className="space-y-4">
+              {forumCategories.map((category) => (
+                <Card key={category.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className={`w-3 h-3 rounded-full ${category.color.split(' ')[0]}`}></div>
+                          <h3 className="text-xl font-semibold text-gray-900">{category.name}</h3>
+                        </div>
+                        <p className="text-gray-600 mb-3">{category.description}</p>
+                        <div className="flex items-center gap-6 text-sm text-gray-500">
+                          <span>{category.threads} threads</span>
+                          <span>{category.posts} posts</span>
+                        </div>
+                      </div>
+                      <Link to={`/forums/category/${category.id}`}>
+                        <Button variant="ghost" size="sm">
+                          <ArrowRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          </div>
+          )}
+
+          {/* Recent Threads */}
+          {activeTab === 'recent' && (
+            <div className="space-y-4">
+              {recentThreads.map((thread) => (
+                <Card key={thread.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          {thread.isPinned && (
+                            <Badge variant="secondary" className="text-xs">
+                              Pinned
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {thread.category}
+                          </Badge>
+                        </div>
+                        <Link to={`/forums/thread/${thread.id}`}>
+                          <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
+                            {thread.title}
+                          </h3>
+                        </Link>
+                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                          <div className="flex items-center gap-1">
+                            <User className="w-4 h-4" />
+                            <span>{thread.author}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="w-4 h-4" />
+                            <span>{thread.replies} replies</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{thread.lastPost}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Link to={`/forums/thread/${thread.id}`}>
+                        <Button variant="ghost" size="sm">
+                          <ArrowRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Login Prompt for Guests */}
+          {!user && (
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle className="text-center">Join the Discussion</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 mb-4">
+                  Sign up or log in to participate in our community discussions, create threads, and help others stay safe online.
+                </p>
+                <div className="flex justify-center gap-4">
+                  <Link to="/login">
+                    <Button variant="outline">Login</Button>
+                  </Link>
+                  <Link to="/register">
+                    <Button>Sign Up</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
       
