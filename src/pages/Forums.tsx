@@ -96,6 +96,42 @@ const recentThreads = [
 const Forums = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'recent'>('categories');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Check user permissions
+  const canCreateThreads = Boolean(user);
+  const canModerate = user && (user.role === 'moderator' || user.role === 'admin');
+  const isAdmin = user && user.role === 'admin';
+
+  const handleTabChange = (tab: 'categories' | 'recent') => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setActiveTab(tab);
+      // Simulate loading time
+      setTimeout(() => setIsLoading(false), 200);
+    } catch (err) {
+      setError('Failed to load forum data');
+      setIsLoading(false);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="container mx-auto px-4 py-8 text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Error Loading Forums</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -107,6 +143,13 @@ const Forums = () => {
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Connect with others, share experiences, and learn from our community of scam-awareness advocates.
           </p>
+          {canModerate && (
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700">
+                You have {user?.role} privileges. You can moderate discussions and manage content.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="max-w-6xl mx-auto">
@@ -140,18 +183,20 @@ const Forums = () => {
             <div className="flex space-x-2">
               <Button
                 variant={activeTab === 'categories' ? 'default' : 'outline'}
-                onClick={() => setActiveTab('categories')}
+                onClick={() => handleTabChange('categories')}
+                disabled={isLoading}
               >
                 Categories
               </Button>
               <Button
                 variant={activeTab === 'recent' ? 'default' : 'outline'}
-                onClick={() => setActiveTab('recent')}
+                onClick={() => handleTabChange('recent')}
+                disabled={isLoading}
               >
                 Recent Threads
               </Button>
             </div>
-            {user && (
+            {canCreateThreads && (
               <Link to="/forums/create-thread">
                 <Button className="flex items-center gap-2">
                   <Plus className="w-4 h-4" />
@@ -161,84 +206,100 @@ const Forums = () => {
             )}
           </div>
 
-          {/* Forum Categories */}
-          {activeTab === 'categories' && (
-            <div className="space-y-4">
-              {forumCategories.map((category) => (
-                <Card key={category.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className={`w-3 h-3 rounded-full ${category.color.split(' ')[0]}`}></div>
-                          <h3 className="text-xl font-semibold text-gray-900">{category.name}</h3>
-                        </div>
-                        <p className="text-gray-600 mb-3">{category.description}</p>
-                        <div className="flex items-center gap-6 text-sm text-gray-500">
-                          <span>{category.threads} threads</span>
-                          <span>{category.posts} posts</span>
-                        </div>
-                      </div>
-                      <Link to={`/forums/category/${category.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading...</p>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Forum Categories */}
+              {activeTab === 'categories' && (
+                <div className="space-y-4">
+                  {forumCategories.map((category) => (
+                    <Card key={category.id} className="hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className={`w-3 h-3 rounded-full ${category.color.split(' ')[0]}`}></div>
+                              <h3 className="text-xl font-semibold text-gray-900">{category.name}</h3>
+                            </div>
+                            <p className="text-gray-600 mb-3">{category.description}</p>
+                            <div className="flex items-center gap-6 text-sm text-gray-500">
+                              <span>{category.threads} threads</span>
+                              <span>{category.posts} posts</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Link to={`/forums/recent`}>
+                              <Button variant="ghost" size="sm" title="View recent threads in this category">
+                                <ArrowRight className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
 
-          {/* Recent Threads */}
-          {activeTab === 'recent' && (
-            <div className="space-y-4">
-              {recentThreads.map((thread) => (
-                <Card key={thread.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          {thread.isPinned && (
-                            <Badge variant="secondary" className="text-xs">
-                              Pinned
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="text-xs">
-                            {thread.category}
-                          </Badge>
+              {/* Recent Threads */}
+              {activeTab === 'recent' && (
+                <div className="space-y-4">
+                  {recentThreads.map((thread) => (
+                    <Card key={thread.id} className="hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              {thread.isPinned && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Pinned
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-xs">
+                                {thread.category}
+                              </Badge>
+                              {canModerate && (
+                                <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700">
+                                  Mod Tools
+                                </Badge>
+                              )}
+                            </div>
+                            <Link to={`/forums/thread/${thread.id}`}>
+                              <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
+                                {thread.title}
+                              </h3>
+                            </Link>
+                            <div className="flex items-center gap-4 text-sm text-gray-500">
+                              <div className="flex items-center gap-1">
+                                <User className="w-4 h-4" />
+                                <span>{thread.author}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <MessageSquare className="w-4 h-4" />
+                                <span>{thread.replies} replies</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-4 h-4" />
+                                <span>{thread.lastPost}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <Link to={`/forums/thread/${thread.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <ArrowRight className="w-4 h-4" />
+                            </Button>
+                          </Link>
                         </div>
-                        <Link to={`/forums/thread/${thread.id}`}>
-                          <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
-                            {thread.title}
-                          </h3>
-                        </Link>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            <span>{thread.author}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MessageSquare className="w-4 h-4" />
-                            <span>{thread.replies} replies</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{thread.lastPost}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <Link to={`/forums/thread/${thread.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {/* Login Prompt for Guests */}
