@@ -1,12 +1,12 @@
-
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ThreadHeader from "@/components/ThreadHeader";
 import ThreadPost from "@/components/ThreadPost";
 import ReplyForm from "@/components/ReplyForm";
+import ModerationPanel from "@/components/ModerationPanel";
 import { threadData } from "@/data/threadData";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ const ForumThread = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showModerationPanel, setShowModerationPanel] = useState(false);
 
   // Convert string id to number and safely access threadData
   const threadId = id ? parseInt(id, 10) : null;
@@ -184,17 +185,33 @@ const ForumThread = () => {
           {canModerate && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-blue-800 font-medium mb-2">Moderator Controls</p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm">
                   Pin Thread
                 </Button>
                 <Button variant="outline" size="sm">
                   Lock Thread
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowModerationPanel(!showModerationPanel)}
+                  className="flex items-center gap-1"
+                >
+                  <Shield className="w-4 h-4" />
+                  {showModerationPanel ? 'Hide' : 'Show'} Moderation Panel
+                </Button>
                 <Button variant="outline" size="sm" className="text-red-600 border-red-300 hover:bg-red-50">
                   Delete Thread
                 </Button>
               </div>
+            </div>
+          )}
+
+          {/* Moderation Panel */}
+          {canModerate && showModerationPanel && (
+            <div className="mb-6">
+              <ModerationPanel />
             </div>
           )}
 

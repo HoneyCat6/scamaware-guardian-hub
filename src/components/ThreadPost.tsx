@@ -1,5 +1,4 @@
-
-import { User, ThumbsUp, Flag, MoreVertical, Trash2, Edit } from "lucide-react";
+import { User, ThumbsUp, Flag, MoreVertical, Trash2, Edit, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -170,8 +169,24 @@ const ThreadPost = ({ post, onDelete, onEdit }: ThreadPostProps) => {
   }
 
   return (
-    <Card className={isLoading ? 'opacity-50' : ''}>
+    <Card className={`${isLoading ? 'opacity-50' : ''} ${post.isReported && canModerate ? 'border-orange-300 bg-orange-50' : ''}`}>
       <CardContent className="p-6">
+        {/* Moderator Alert for Reported Posts */}
+        {post.isReported && canModerate && (
+          <div className="mb-4 p-3 bg-orange-100 border border-orange-300 rounded-md flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-orange-600" />
+            <div className="flex-1">
+              <p className="text-orange-800 font-medium">Reported Post</p>
+              <p className="text-orange-700 text-sm">
+                This post has been reported {post.reportCount} time{post.reportCount !== 1 ? 's' : ''} and requires moderation.
+              </p>
+            </div>
+            <Badge variant="destructive" className="text-xs">
+              {post.reportCount} report{post.reportCount !== 1 ? 's' : ''}
+            </Badge>
+          </div>
+        )}
+
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -201,7 +216,7 @@ const ThreadPost = ({ post, onDelete, onEdit }: ThreadPostProps) => {
               {likeCount}
             </Button>
             
-            {canReport && (
+            {canReport && !isOwnPost && (
               <Button 
                 variant="ghost" 
                 size="sm"
