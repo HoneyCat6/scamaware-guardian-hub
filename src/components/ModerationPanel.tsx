@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { threadData, Post } from "@/data/threadData";
 
 const ModerationPanel = () => {
   const { toast } = useToast();
+  const { user, banUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   // Get all reported posts
@@ -81,18 +83,25 @@ const ModerationPanel = () => {
   };
 
   const handleBanUser = async (username: string) => {
+    if (!user) return;
+    
     try {
       setIsLoading(true);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      // Find user by username and ban them
+      // In a real app, you'd get the user ID from the backend
+      const userId = Math.floor(Math.random() * 1000) + 100; // Mock user ID
+      banUser(userId, user.username);
+      
       toast({
         title: "User banned",
         description: `User ${username} has been banned from the forum.`,
       });
       
-      console.log(`Banned user ${username}`);
+      console.log(`Banned user ${username} by ${user.username}`);
     } catch (err) {
       toast({
         title: "Error",

@@ -6,6 +6,9 @@ interface User {
   username: string;
   email: string;
   role: 'user' | 'moderator' | 'admin';
+  isBanned?: boolean;
+  bannedAt?: string;
+  bannedBy?: string;
 }
 
 interface AuthContextType {
@@ -15,6 +18,9 @@ interface AuthContextType {
   logout: () => void;
   updateUserRole: (userId: number, newRole: string) => void;
   deleteUser: (userId: number) => void;
+  banUser: (userId: number, bannedBy: string) => void;
+  unbanUser: (userId: number) => void;
+  getBannedUsers: () => User[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,14 +40,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Check for stored session
     const storedUser = localStorage.getItem("scamaware_user");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      // Check if user is banned
+      const currentUser = users.find(u => u.id === parsedUser.id);
+      if (currentUser?.isBanned) {
+        // Auto-logout banned users
+        localStorage.removeItem("scamaware_user");
+        setUser(null);
+      } else {
+        setUser(parsedUser);
+      }
     }
-  }, []);
+  }, [users]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Mock authentication - in a real app, this would validate against a backend
     const foundUser = users.find(u => u.email === email);
     if (foundUser) {
+      // Check if user is banned
+      if (foundUser.isBanned) {
+        return false; // Banned users cannot login
+      }
       // In a real app, you'd verify the password hash
       setUser(foundUser);
       localStorage.setItem("scamaware_user", JSON.stringify(foundUser));
@@ -85,6 +104,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUsers(prev => prev.filter(u => u.id !== userId));
   };
 
+  const banUser = (userId: number, bannedBy: string) => {
+    setUsers(prev => prev.map(u => 
+      u.id === userId ? { 
+        ...u, 
+        isBanned: true, 
+        bannedAt: new Date().toISOString(),
+        bannedBy: bannedBy
+      } : u
+    ));
+    
+    // If the banned user is currently logged in, log them out
+    if (user && user.id === userId) {
+      logout();
+    }
+  };
+
+  const unbanUser = (userId: number) => {
+    setUsers(prev => prev.map(u => 
+      u.id === userId ? { 
+        ...u, 
+        isBanned: false, 
+        bannedAt: undefined,
+        bannedBy: undefined
+      } : u
+    ));
+  };
+
+  const getBannedUsers = () => {
+    return users.filter(u => u.isBanned);
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -92,7 +142,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       register, 
       logout, 
       updateUserRole, 
-      deleteUser 
+      deleteUser,
+      banUser,
+      unbanUser,
+      getBannedUsers
     }}>
       {children}
     </AuthContext.Provider>

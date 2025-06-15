@@ -1,75 +1,73 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Reply, AlertCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 interface ReplyFormProps {
-  onSubmit?: (content: string) => Promise<void>;
-  placeholder?: string;
+  onSubmit: (content: string) => Promise<void>;
 }
 
-const ReplyForm = ({ onSubmit, placeholder = "Share your thoughts, experiences, or advice..." }: ReplyFormProps) => {
+const ReplyForm = ({ onSubmit }: ReplyFormProps) => {
+  const [content, setContent] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
-  const [newPost, setNewPost] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmitPost = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) {
       toast({
-        title: "Login required",
-        description: "You need to be logged in to post replies.",
+        title: "Authentication required",
+        description: "Please log in to post replies.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!newPost.trim()) {
-      setError("Please enter a message before posting.");
+    if (user.isBanned) {
+      toast({
+        title: "Account suspended",
+        description: "Your account has been banned and cannot post replies.",
+        variant: "destructive",
+      });
       return;
     }
 
-    if (newPost.trim().length < 10) {
-      setError("Your message must be at least 10 characters long.");
+    if (!content.trim()) {
+      toast({
+        title: "Content required",
+        description: "Please enter some content for your reply.",
+        variant: "destructive",
+      });
       return;
     }
 
-    if (newPost.trim().length > 5000) {
-      setError("Your message is too long. Please keep it under 5000 characters.");
+    if (content.length > 2000) {
+      toast({
+        title: "Content too long",
+        description: "Please keep your reply under 2000 characters.",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setError(null);
-      
-      if (onSubmit) {
-        await onSubmit(newPost.trim());
-      } else {
-        // Default behavior - simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
+      await onSubmit(content);
+      setContent("");
       toast({
-        title: "Post submitted!",
-        description: "Your reply has been added to the thread.",
+        title: "Reply posted",
+        description: "Your reply has been successfully posted.",
       });
-      
-      setNewPost("");
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to submit your reply. Please try again.";
-      setError(errorMessage);
+    } catch (error) {
       toast({
-        title: "Error",
-        description: errorMessage,
+        title: "Error posting reply",
+        description: error instanceof Error ? error.message : "Failed to post reply. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -80,18 +78,27 @@ const ReplyForm = ({ onSubmit, placeholder = "Share your thoughts, experiences, 
   if (!user) {
     return (
       <Card>
-        <CardContent className="p-6 text-center">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Join the Discussion</h3>
-          <p className="text-gray-600 mb-4">
-            You need to be logged in to reply to this thread.
-          </p>
-          <div className="flex justify-center gap-4">
-            <Link to="/login">
-              <Button variant="outline">Login</Button>
-            </Link>
-            <Link to="/register">
-              <Button>Sign Up</Button>
-            </Link>
+        <CardContent className="p-6">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Please log in to post a reply.</p>
+            <Button variant="outline">
+              Log In
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (user.isBanned) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="p-6">
+          <div className="text-center">
+            <p className="text-red-600 font-medium mb-2">Account Suspended</p>
+            <p className="text-red-600 text-sm">
+              Your account has been banned and cannot post replies.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -101,51 +108,33 @@ const ReplyForm = ({ onSubmit, placeholder = "Share your thoughts, experiences, 
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Post a Reply</h3>
-          {user.role === 'moderator' || user.role === 'admin' ? (
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-              {user.role === 'admin' ? 'Admin' : 'Moderator'}
-            </span>
-          ) : null}
-        </div>
-        
-        <form onSubmit={handleSubmitPost}>
-          <div className="mb-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="reply-content" className="block text-sm font-medium text-gray-700 mb-2">
+              Post a Reply
+            </label>
             <Textarea
-              value={newPost}
-              onChange={(e) => {
-                setNewPost(e.target.value);
-                if (error) setError(null);
-              }}
-              placeholder={placeholder}
-              rows={4}
-              className={error ? "border-red-500 focus:border-red-500" : ""}
+              id="reply-content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Share your thoughts..."
+              className="min-h-[120px]"
               disabled={isSubmitting}
-              maxLength={5000}
             />
-            <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
-              <span>{newPost.length}/5000 characters</span>
-              {newPost.trim().length > 0 && newPost.trim().length < 10 && (
-                <span className="text-yellow-600">Minimum 10 characters required</span>
-              )}
+            <div className="flex justify-between items-center mt-2">
+              <span className="text-sm text-gray-500">
+                {content.length}/2000 characters
+              </span>
             </div>
           </div>
           
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-              <span className="text-red-700 text-sm">{error}</span>
-            </div>
-          )}
-          
           <div className="flex justify-end">
-            <Button
-              type="submit"
-              disabled={isSubmitting || !newPost.trim() || newPost.trim().length < 10}
+            <Button 
+              type="submit" 
+              disabled={isSubmitting || !content.trim()}
               className="flex items-center gap-2"
             >
-              <Reply className="w-4 h-4" />
+              <Send className="w-4 h-4" />
               {isSubmitting ? "Posting..." : "Post Reply"}
             </Button>
           </div>
