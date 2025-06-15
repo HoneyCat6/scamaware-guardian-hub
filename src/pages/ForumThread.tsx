@@ -1,5 +1,6 @@
+
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, AlertCircle, Shield } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -7,6 +8,11 @@ import ThreadHeader from "@/components/ThreadHeader";
 import ThreadPost from "@/components/ThreadPost";
 import ReplyForm from "@/components/ReplyForm";
 import ModerationPanel from "@/components/ModerationPanel";
+import ThreadErrorDisplay from "@/components/ThreadErrorDisplay";
+import ThreadNotFound from "@/components/ThreadNotFound";
+import InvalidThreadId from "@/components/InvalidThreadId";
+import ModeratorControls from "@/components/ModeratorControls";
+import ThreadLoadingOverlay from "@/components/ThreadLoadingOverlay";
 import { threadData } from "@/data/threadData";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -102,48 +108,11 @@ const ForumThread = () => {
   };
 
   if (!threadId || isNaN(threadId)) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="container mx-auto px-4 py-8 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <AlertCircle className="w-6 h-6 text-red-600" />
-            <h1 className="text-2xl font-bold text-red-600">Invalid Thread ID</h1>
-          </div>
-          <p className="text-gray-600 mb-4">The thread ID provided is not valid.</p>
-          <Link to="/forums">
-            <Button>Back to Forums</Button>
-          </Link>
-        </div>
-        <Footer />
-      </div>
-    );
+    return <InvalidThreadId />;
   }
 
   if (!thread) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="container mx-auto px-4 py-8 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <AlertCircle className="w-6 h-6 text-yellow-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Thread Not Found</h1>
-          </div>
-          <p className="text-gray-600 mb-4">
-            The thread you're looking for doesn't exist or may have been removed.
-          </p>
-          <div className="flex justify-center gap-4">
-            <Link to="/forums">
-              <Button variant="outline">Back to Forums</Button>
-            </Link>
-            <Button onClick={() => window.location.reload()}>
-              Try Again
-            </Button>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
+    return <ThreadNotFound />;
   }
 
   return (
@@ -164,48 +133,15 @@ const ForumThread = () => {
 
           {/* Error Display */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-              <div>
-                <p className="text-red-800 font-medium">Error</p>
-                <p className="text-red-700 text-sm">{error}</p>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setError(null)}
-                className="ml-auto"
-              >
-                Dismiss
-              </Button>
-            </div>
+            <ThreadErrorDisplay error={error} onDismiss={() => setError(null)} />
           )}
 
           {/* Moderator Controls */}
           {canModerate && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-blue-800 font-medium mb-2">Moderator Controls</p>
-              <div className="flex gap-2 flex-wrap">
-                <Button variant="outline" size="sm">
-                  Pin Thread
-                </Button>
-                <Button variant="outline" size="sm">
-                  Lock Thread
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setShowModerationPanel(!showModerationPanel)}
-                  className="flex items-center gap-1"
-                >
-                  <Shield className="w-4 h-4" />
-                  {showModerationPanel ? 'Hide' : 'Show'} Moderation Panel
-                </Button>
-                <Button variant="outline" size="sm" className="text-red-600 border-red-300 hover:bg-red-50">
-                  Delete Thread
-                </Button>
-              </div>
-            </div>
+            <ModeratorControls 
+              showModerationPanel={showModerationPanel}
+              onToggleModerationPanel={() => setShowModerationPanel(!showModerationPanel)}
+            />
           )}
 
           {/* Moderation Panel */}
@@ -219,12 +155,7 @@ const ForumThread = () => {
           <ThreadHeader thread={thread} />
 
           {/* Loading Overlay */}
-          {isLoading && (
-            <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-md text-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-              <p className="text-gray-600">Processing...</p>
-            </div>
-          )}
+          {isLoading && <ThreadLoadingOverlay />}
 
           {/* Posts */}
           <div className="space-y-4 mb-8">
