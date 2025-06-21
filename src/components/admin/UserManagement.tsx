@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Shield, Trash2, UserX, UserCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +24,8 @@ const UserManagement = () => {
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
       setIsLoading(true);
-      await updateUserRole(userId, newRole);
+      // Type cast the string to the expected union type
+      await updateUserRole(userId, newRole as 'user' | 'moderator' | 'admin');
       
       toast({
         title: "Role updated",
