@@ -14,13 +14,37 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  if (user) {
+    navigate("/", { replace: true });
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!username.trim() || !password.trim() || !confirmPassword.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (username.length < 3) {
+      toast({
+        title: "Error",
+        description: "Username must be at least 3 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (password !== confirmPassword) {
       toast({
         title: "Error",
@@ -42,24 +66,25 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      const success = await register(username, password);
+      const success = await register(username.trim(), password);
       if (success) {
         toast({
           title: "Success!",
-          description: "Your account has been created successfully.",
+          description: "Your account has been created successfully. You can now sign in.",
         });
-        navigate("/");
+        navigate("/login");
       } else {
         toast({
           title: "Error",
-          description: "Username already exists or registration failed.",
+          description: "Username already exists or registration failed. Please try a different username.",
           variant: "destructive",
         });
       }
     } catch (error) {
+      console.error('Registration error:', error);
       toast({
         title: "Error",
-        description: "An error occurred during registration.",
+        description: "An error occurred during registration. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -89,7 +114,8 @@ const Register = () => {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Choose a username"
+                  placeholder="Choose a username (min 3 characters)"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -101,7 +127,8 @@ const Register = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Create a password"
+                  placeholder="Create a password (min 6 characters)"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -114,6 +141,7 @@ const Register = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm your password"
+                  disabled={isLoading}
                 />
               </div>
             </div>

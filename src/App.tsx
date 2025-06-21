@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -34,13 +35,29 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/news" element={<News />} />
             <Route path="/article/:id" element={<Article />} />
-            <Route path="/create-article" element={<CreateArticle />} />
-            <Route path="/edit-article/:id" element={<EditArticle />} />
+            <Route path="/create-article" element={
+              <ProtectedRoute>
+                <CreateArticle />
+              </ProtectedRoute>
+            } />
+            <Route path="/edit-article/:id" element={
+              <ProtectedRoute>
+                <EditArticle />
+              </ProtectedRoute>
+            } />
             <Route path="/forums" element={<Forums />} />
             <Route path="/forums/recent" element={<RecentThreads />} />
             <Route path="/forums/thread/:id" element={<ForumThread />} />
-            <Route path="/forums/create-thread" element={<CreateThread />} />
-            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/forums/create-thread" element={
+              <ProtectedRoute>
+                <CreateThread />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminPanel />
+              </ProtectedRoute>
+            } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -19,10 +19,10 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   register: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  updateUserRole: (userId: string, newRole: string) => void;
-  deleteUser: (userId: string) => void;
-  banUser: (userId: string, bannedBy: string) => void;
-  unbanUser: (userId: string) => void;
+  updateUserRole: (userId: string, newRole: string) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
+  banUser: (userId: string, bannedBy: string) => Promise<void>;
+  unbanUser: (userId: string) => Promise<void>;
   getBannedUsers: () => AuthUser[];
 }
 
@@ -40,26 +40,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         
         if (session?.user) {
-          // Fetch user profile from profiles table
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-            
-          console.log('Profile data:', profile, 'Error:', error);
-          
-          if (profile) {
-            setUser({
-              id: profile.id,
-              username: profile.username,
-              email: profile.email,
-              role: profile.role,
-              isBanned: profile.is_banned,
-              bannedAt: profile.banned_at,
-              bannedBy: profile.banned_by
-            });
-          }
+          // Defer profile fetch to avoid auth deadlocks
+          setTimeout(async () => {
+            try {
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+                
+              console.log('Profile data:', profile, 'Error:', error);
+              
+              if (profile) {
+                setUser({
+                  id: profile.id,
+                  username: profile.username,
+                  email: profile.email,
+                  role: profile.role,
+                  isBanned: profile.is_banned,
+                  bannedAt: profile.banned_at,
+                  bannedBy: profile.banned_by
+                });
+              }
+            } catch (err) {
+              console.error('Error fetching profile:', err);
+            }
+          }, 0);
         } else {
           setUser(null);
         }
@@ -68,15 +74,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        // Fetch user profile
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data: profile }) => {
+      if (session) {
+        setSession(session);
+        // Defer profile fetch
+        setTimeout(async () => {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+              
             if (profile) {
               setUser({
                 id: profile.id,
@@ -88,7 +96,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 bannedBy: profile.banned_by
               });
             }
-          });
+          } catch (err) {
+            console.error('Error fetching initial profile:', err);
+          }
+        }, 0);
       }
     });
 
@@ -104,12 +115,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('profiles')
         .select('email, is_banned')
         .eq('username', username)
-        .single();
+        .maybeSingle();
 
       console.log('Profile lookup result:', profile, 'Error:', profileError);
 
-      if (profileError || !profile) {
-        console.log('User not found or error:', profileError);
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.log('Database error:', profileError);
+        return false;
+      }
+
+      if (!profile) {
+        console.log('User not found');
         return false;
       }
 
@@ -147,35 +163,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (existingUser) {
         console.log('Username already taken');
-        return false; // Username already taken
+        return false;
       }
 
-      // Create a valid email using example.com domain (RFC compliant)
-      const tempEmail = `${username}@example.com`;
+      // Create email using a more reliable domain
+      const tempEmail = `${username}@temp-scamaware.net`;
       console.log('Using email:', tempEmail);
 
-      // Sign up with valid email
+      // Sign up with email
       const { data, error } = await supabase.auth.signUp({
         email: tempEmail,
         password: password,
         options: {
           data: {
             username: username
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/`
         }
       });
 
       console.log('Sign up result:', data, 'Error:', error);
 
-      if (error || !data.user) {
+      if (error) {
         console.log('Registration failed:', error);
         return false;
       }
 
-      // Since we're using a fake email domain, the user won't get a confirmation email
-      // and will be automatically confirmed. The trigger will create their profile.
-      
-      return true;
+      if (data.user && !data.session) {
+        // User created but needs email confirmation
+        console.log('User created, waiting for confirmation');
+        return true;
+      }
+
+      return !!data.user;
     } catch (error) {
       console.error('Registration error:', error);
       return false;
@@ -183,29 +203,93 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      // Force page reload to ensure clean state
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout even if there's an error
+      setUser(null);
+      setSession(null);
+      window.location.href = '/';
+    }
   };
 
-  // Mock functions for admin functionality - these would need to be implemented with proper Supabase calls
-  const updateUserRole = (userId: string, newRole: string) => {
-    console.log('Update user role:', userId, newRole);
+  const updateUserRole = async (userId: string, newRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      console.log('User role updated successfully');
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      throw error;
+    }
   };
 
-  const deleteUser = (userId: string) => {
-    console.log('Delete user:', userId);
+  const deleteUser = async (userId: string) => {
+    try {
+      // In a real implementation, you'd need admin API access to delete auth users
+      // For now, just mark as deleted or ban
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_banned: true, banned_at: new Date().toISOString() })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      console.log('User deleted/banned successfully');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
   };
 
-  const banUser = (userId: string, bannedBy: string) => {
-    console.log('Ban user:', userId, bannedBy);
+  const banUser = async (userId: string, bannedBy: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_banned: true, 
+          banned_at: new Date().toISOString(),
+          banned_by: bannedBy
+        })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      console.log('User banned successfully');
+    } catch (error) {
+      console.error('Error banning user:', error);
+      throw error;
+    }
   };
 
-  const unbanUser = (userId: string) => {
-    console.log('Unban user:', userId);
+  const unbanUser = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_banned: false, 
+          banned_at: null,
+          banned_by: null
+        })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      console.log('User unbanned successfully');
+    } catch (error) {
+      console.error('Error unbanning user:', error);
+      throw error;
+    }
   };
 
   const getBannedUsers = (): AuthUser[] => {
+    // This would need to be implemented with a proper query in a real app
     return [];
   };
 

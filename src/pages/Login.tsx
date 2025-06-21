@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,33 +13,54 @@ const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Redirect if already logged in
+  if (user) {
+    const from = location.state?.from?.pathname || "/";
+    navigate(from, { replace: true });
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!username.trim() || !password.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter both username and password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const success = await login(username, password);
+      const success = await login(username.trim(), password);
       if (success) {
         toast({
           title: "Success!",
           description: "You have been logged in successfully.",
         });
-        navigate("/");
+        // Redirect to the page they were trying to access or home
+        const from = location.state?.from?.pathname || "/";
+        navigate(from, { replace: true });
       } else {
         toast({
           title: "Error",
-          description: "Invalid username or password.",
+          description: "Invalid username or password, or account may be banned.",
           variant: "destructive",
         });
       }
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: "Error",
-        description: "An error occurred during login.",
+        description: "An error occurred during login. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -70,6 +91,7 @@ const Login = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -82,6 +104,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
+                  disabled={isLoading}
                 />
               </div>
             </div>

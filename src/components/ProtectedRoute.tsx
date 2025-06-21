@@ -1,0 +1,39 @@
+
+import { useAuth } from "@/hooks/useAuth";
+import { Navigate, useLocation } from "react-router-dom";
+import { ReactNode } from "react";
+
+interface ProtectedRouteProps {
+  children: ReactNode;
+  requiredRole?: 'user' | 'moderator' | 'admin';
+}
+
+const ProtectedRoute = ({ children, requiredRole = 'user' }: ProtectedRouteProps) => {
+  const { user, session } = useAuth();
+  const location = useLocation();
+
+  // If no session, redirect to login
+  if (!session) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // If user is banned, redirect to login
+  if (user?.isBanned) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Check role requirements
+  if (requiredRole && user?.role) {
+    const roleHierarchy = { user: 0, moderator: 1, admin: 2 };
+    const userLevel = roleHierarchy[user.role];
+    const requiredLevel = roleHierarchy[requiredRole];
+    
+    if (userLevel < requiredLevel) {
+      return <Navigate to="/" replace />;
+    }
+  }
+
+  return <>{children}</>;
+};
+
+export default ProtectedRoute;

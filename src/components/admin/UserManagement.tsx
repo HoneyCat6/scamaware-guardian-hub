@@ -14,10 +14,10 @@ const UserManagement = () => {
 
   // Mock users data - in a real app this would come from an API
   const mockUsers = [
-    { id: "1", username: "admin", email: "admin@scamaware.com", role: "admin" as const },
-    { id: "2", username: "moderator", email: "mod@scamaware.com", role: "moderator" as const },
-    { id: "3", username: "user1", email: "user1@example.com", role: "user" as const },
-    { id: "4", username: "user2", email: "user2@example.com", role: "user" as const },
+    { id: "1aef5b14-e3a9-4e51-8dca-191c86cde512", username: "admin", email: "admin@scamaware.com", role: "admin" as const },
+    { id: "2bef5b14-e3a9-4e51-8dca-191c86cde513", username: "moderator", email: "mod@scamaware.com", role: "moderator" as const },
+    { id: "3cef5b14-e3a9-4e51-8dca-191c86cde514", username: "user1", email: "user1@example.com", role: "user" as const },
+    { id: "4def5b14-e3a9-4e51-8dca-191c86cde515", username: "user2", email: "user2@example.com", role: "user" as const },
   ];
 
   const bannedUsers = getBannedUsers();
@@ -25,9 +25,7 @@ const UserManagement = () => {
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      updateUserRole(userId, newRole);
+      await updateUserRole(userId, newRole);
       
       toast({
         title: "Role updated",
@@ -47,9 +45,7 @@ const UserManagement = () => {
   const handleDeleteUser = async (userId: string, username: string) => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      deleteUser(userId);
+      await deleteUser(userId);
       
       toast({
         title: "User deleted",
@@ -69,9 +65,7 @@ const UserManagement = () => {
   const handleBanUser = async (userId: string, username: string) => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      banUser(userId, "admin");
+      await banUser(userId, "admin");
       
       toast({
         title: "User banned",
@@ -91,9 +85,7 @@ const UserManagement = () => {
   const handleUnbanUser = async (userId: string, username: string) => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      unbanUser(userId);
+      await unbanUser(userId);
       
       toast({
         title: "User unbanned",
