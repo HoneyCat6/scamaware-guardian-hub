@@ -36,16 +36,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         
         if (session?.user) {
           // Fetch user profile from profiles table
-          const { data: profile } = await supabase
+          const { data: profile, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .single();
             
+          console.log('Profile data:', profile, 'Error:', error);
+          
           if (profile) {
             setUser({
               id: profile.id,
@@ -94,6 +97,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
+      console.log('Attempting login for username:', username);
+      
       // First, get the user's email from the profiles table using username
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -101,11 +106,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('username', username)
         .single();
 
+      console.log('Profile lookup result:', profile, 'Error:', profileError);
+
       if (profileError || !profile) {
+        console.log('User not found or error:', profileError);
         return false;
       }
 
       if (profile.is_banned) {
+        console.log('User is banned');
         return false;
       }
 
@@ -115,6 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password: password,
       });
 
+      console.log('Sign in result - Error:', error);
       return !error;
     } catch (error) {
       console.error('Login error:', error);
@@ -124,21 +134,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const register = async (username: string, password: string): Promise<boolean> => {
     try {
+      console.log('Attempting registration for username:', username);
+      
       // Check if username already exists
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error: checkError } = await supabase
         .from('profiles')
         .select('username')
         .eq('username', username)
-        .single();
+        .maybeSingle();
+
+      console.log('Username check result:', existingUser, 'Error:', checkError);
 
       if (existingUser) {
+        console.log('Username already taken');
         return false; // Username already taken
       }
 
-      // Create a temporary email using username
-      const tempEmail = `${username}@scamaware.local`;
+      // Create a valid email using example.com domain (RFC compliant)
+      const tempEmail = `${username}@example.com`;
+      console.log('Using email:', tempEmail);
 
-      // Sign up with temporary email
+      // Sign up with valid email
       const { data, error } = await supabase.auth.signUp({
         email: tempEmail,
         password: password,
@@ -149,10 +165,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       });
 
+      console.log('Sign up result:', data, 'Error:', error);
+
       if (error || !data.user) {
+        console.log('Registration failed:', error);
         return false;
       }
 
+      // Since we're using a fake email domain, the user won't get a confirmation email
+      // and will be automatically confirmed. The trigger will create their profile.
+      
       return true;
     } catch (error) {
       console.error('Registration error:', error);
@@ -168,27 +190,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Mock functions for admin functionality - these would need to be implemented with proper Supabase calls
   const updateUserRole = (userId: string, newRole: string) => {
-    // TODO: Implement with Supabase
     console.log('Update user role:', userId, newRole);
   };
 
   const deleteUser = (userId: string) => {
-    // TODO: Implement with Supabase
     console.log('Delete user:', userId);
   };
 
   const banUser = (userId: string, bannedBy: string) => {
-    // TODO: Implement with Supabase
     console.log('Ban user:', userId, bannedBy);
   };
 
   const unbanUser = (userId: string) => {
-    // TODO: Implement with Supabase
     console.log('Unban user:', userId);
   };
 
   const getBannedUsers = (): AuthUser[] => {
-    // TODO: Implement with Supabase
     return [];
   };
 
