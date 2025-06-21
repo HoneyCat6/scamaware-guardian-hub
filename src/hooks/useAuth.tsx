@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -19,7 +18,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   register: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  updateUserRole: (userId: string, newRole: string) => Promise<void>;
+  updateUserRole: (userId: string, newRole: 'user' | 'moderator' | 'admin') => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   banUser: (userId: string, bannedBy: string) => Promise<void>;
   unbanUser: (userId: string) => Promise<void>;
@@ -218,7 +217,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: string) => {
+  const updateUserRole = async (userId: string, newRole: 'user' | 'moderator' | 'admin') => {
     try {
       const { error } = await supabase
         .from('profiles')
