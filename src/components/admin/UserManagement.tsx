@@ -14,15 +14,15 @@ const UserManagement = () => {
 
   // Mock users data - in a real app this would come from an API
   const mockUsers = [
-    { id: 1, username: "admin", email: "admin@scamaware.com", role: "admin" as const },
-    { id: 2, username: "moderator", email: "mod@scamaware.com", role: "moderator" as const },
-    { id: 3, username: "user1", email: "user1@example.com", role: "user" as const },
-    { id: 4, username: "user2", email: "user2@example.com", role: "user" as const },
+    { id: "1", username: "admin", email: "admin@scamaware.com", role: "admin" as const },
+    { id: "2", username: "moderator", email: "mod@scamaware.com", role: "moderator" as const },
+    { id: "3", username: "user1", email: "user1@example.com", role: "user" as const },
+    { id: "4", username: "user2", email: "user2@example.com", role: "user" as const },
   ];
 
   const bannedUsers = getBannedUsers();
 
-  const handleRoleChange = async (userId: number, newRole: string) => {
+  const handleRoleChange = async (userId: string, newRole: string) => {
     try {
       setIsLoading(true);
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -44,7 +44,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: number, username: string) => {
+  const handleDeleteUser = async (userId: string, username: string) => {
     try {
       setIsLoading(true);
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -66,7 +66,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleBanUser = async (userId: number, username: string) => {
+  const handleBanUser = async (userId: string, username: string) => {
     try {
       setIsLoading(true);
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -88,7 +88,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleUnbanUser = async (userId: number, username: string) => {
+  const handleUnbanUser = async (userId: string, username: string) => {
     try {
       setIsLoading(true);
       await new Promise(resolve => setTimeout(resolve, 500));

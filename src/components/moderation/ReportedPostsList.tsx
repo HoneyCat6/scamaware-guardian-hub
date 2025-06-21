@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { CheckCircle, XCircle, Eye, Ban } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,7 +83,8 @@ const ReportedPostsList = () => {
       setIsLoading(true);
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      const userId = Math.floor(Math.random() * 1000) + 100;
+      // Generate a UUID-like string for the mock user ID
+      const userId = `user-${Math.random().toString(36).substr(2, 9)}`;
       banUser(userId, user.username);
       
       toast({
