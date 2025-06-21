@@ -10,7 +10,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -22,7 +22,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
+      const success = await login(username, password);
       if (success) {
         toast({
           title: "Success!",
@@ -32,7 +32,7 @@ const Login = () => {
       } else {
         toast({
           title: "Error",
-          description: "Invalid email or password.",
+          description: "Invalid username or password.",
           variant: "destructive",
         });
       }
@@ -61,15 +61,15 @@ const Login = () => {
           <form className="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-lg" onSubmit={handleSubmit}>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="email">Email address</Label>
+                <Label htmlFor="username">Username</Label>
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
+                  id="username"
+                  name="username"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
                 />
               </div>
               <div>
@@ -84,14 +84,6 @@ const Login = () => {
                   placeholder="Enter your password"
                 />
               </div>
-            </div>
-
-            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
-              <strong>Demo Accounts:</strong><br />
-              Admin: admin@scamaware.com<br />
-              Moderator: mod@scamaware.com<br />
-              User: user1@example.com<br />
-              <em>Password: any text works</em>
             </div>
 
             <Button

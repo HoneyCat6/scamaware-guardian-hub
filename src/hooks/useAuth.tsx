@@ -1,8 +1,10 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { User, Session } from "@supabase/supabase-js";
 
-interface User {
-  id: number;
+interface AuthUser {
+  id: string;
   username: string;
   email: string;
   role: 'user' | 'moderator' | 'admin';
@@ -12,132 +14,188 @@ interface User {
 }
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (username: string, email: string, password: string) => Promise<boolean>;
+  user: AuthUser | null;
+  session: Session | null;
+  login: (username: string, password: string) => Promise<boolean>;
+  register: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  updateUserRole: (userId: number, newRole: string) => void;
-  deleteUser: (userId: number) => void;
-  banUser: (userId: number, bannedBy: string) => void;
-  unbanUser: (userId: number) => void;
-  getBannedUsers: () => User[];
+  updateUserRole: (userId: string, newRole: string) => void;
+  deleteUser: (userId: string) => void;
+  banUser: (userId: string, bannedBy: string) => void;
+  unbanUser: (userId: string) => void;
+  getBannedUsers: () => AuthUser[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user data - in a real app, this would come from a backend
-const mockUsers: User[] = [
-  { id: 1, username: "admin", email: "admin@scamaware.com", role: "admin" },
-  { id: 2, username: "moderator", email: "mod@scamaware.com", role: "moderator" },
-  { id: 3, username: "user1", email: "user1@example.com", role: "user" },
-];
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    // Check for stored session
-    const storedUser = localStorage.getItem("scamaware_user");
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      // Check if user is banned
-      const currentUser = users.find(u => u.id === parsedUser.id);
-      if (currentUser?.isBanned) {
-        // Auto-logout banned users
-        localStorage.removeItem("scamaware_user");
-        setUser(null);
-      } else {
-        setUser(parsedUser);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          // Fetch user profile from profiles table
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profile) {
+            setUser({
+              id: profile.id,
+              username: profile.username,
+              email: profile.email,
+              role: profile.role,
+              isBanned: profile.is_banned,
+              bannedAt: profile.banned_at,
+              bannedBy: profile.banned_by
+            });
+          }
+        } else {
+          setUser(null);
+        }
       }
-    }
-  }, [users]);
+    );
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication - in a real app, this would validate against a backend
-    const foundUser = users.find(u => u.email === email);
-    if (foundUser) {
-      // Check if user is banned
-      if (foundUser.isBanned) {
-        return false; // Banned users cannot login
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        // Fetch user profile
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            if (profile) {
+              setUser({
+                id: profile.id,
+                username: profile.username,
+                email: profile.email,
+                role: profile.role,
+                isBanned: profile.is_banned,
+                bannedAt: profile.banned_at,
+                bannedBy: profile.banned_by
+              });
+            }
+          });
       }
-      // In a real app, you'd verify the password hash
-      setUser(foundUser);
-      localStorage.setItem("scamaware_user", JSON.stringify(foundUser));
-      return true;
-    }
-    return false;
-  };
+    });
 
-  const register = async (username: string, email: string, password: string): Promise<boolean> => {
-    // Check if user already exists
-    if (users.find(u => u.email === email || u.username === username)) {
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      // First, get the user's email from the profiles table using username
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('email, is_banned')
+        .eq('username', username)
+        .single();
+
+      if (profileError || !profile) {
+        return false;
+      }
+
+      if (profile.is_banned) {
+        return false;
+      }
+
+      // Sign in with email and password
+      const { error } = await supabase.auth.signInWithPassword({
+        email: profile.email,
+        password: password,
+      });
+
+      return !error;
+    } catch (error) {
+      console.error('Login error:', error);
       return false;
     }
-
-    // Create new user
-    const newUser: User = {
-      id: Math.max(...users.map(u => u.id)) + 1,
-      username,
-      email,
-      role: 'user'
-    };
-
-    setUsers(prev => [...prev, newUser]);
-    setUser(newUser);
-    localStorage.setItem("scamaware_user", JSON.stringify(newUser));
-    return true;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("scamaware_user");
-  };
+  const register = async (username: string, password: string): Promise<boolean> => {
+    try {
+      // Check if username already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username)
+        .single();
 
-  const updateUserRole = (userId: number, newRole: string) => {
-    setUsers(prev => prev.map(u => 
-      u.id === userId ? { ...u, role: newRole as 'user' | 'moderator' | 'admin' } : u
-    ));
-  };
+      if (existingUser) {
+        return false; // Username already taken
+      }
 
-  const deleteUser = (userId: number) => {
-    setUsers(prev => prev.filter(u => u.id !== userId));
-  };
+      // Create a temporary email using username
+      const tempEmail = `${username}@scamaware.local`;
 
-  const banUser = (userId: number, bannedBy: string) => {
-    setUsers(prev => prev.map(u => 
-      u.id === userId ? { 
-        ...u, 
-        isBanned: true, 
-        bannedAt: new Date().toISOString(),
-        bannedBy: bannedBy
-      } : u
-    ));
-    
-    // If the banned user is currently logged in, log them out
-    if (user && user.id === userId) {
-      logout();
+      // Sign up with temporary email
+      const { data, error } = await supabase.auth.signUp({
+        email: tempEmail,
+        password: password,
+        options: {
+          data: {
+            username: username
+          }
+        }
+      });
+
+      if (error || !data.user) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Registration error:', error);
+      return false;
     }
   };
 
-  const unbanUser = (userId: number) => {
-    setUsers(prev => prev.map(u => 
-      u.id === userId ? { 
-        ...u, 
-        isBanned: false, 
-        bannedAt: undefined,
-        bannedBy: undefined
-      } : u
-    ));
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
   };
 
-  const getBannedUsers = () => {
-    return users.filter(u => u.isBanned);
+  // Mock functions for admin functionality - these would need to be implemented with proper Supabase calls
+  const updateUserRole = (userId: string, newRole: string) => {
+    // TODO: Implement with Supabase
+    console.log('Update user role:', userId, newRole);
+  };
+
+  const deleteUser = (userId: string) => {
+    // TODO: Implement with Supabase
+    console.log('Delete user:', userId);
+  };
+
+  const banUser = (userId: string, bannedBy: string) => {
+    // TODO: Implement with Supabase
+    console.log('Ban user:', userId, bannedBy);
+  };
+
+  const unbanUser = (userId: string) => {
+    // TODO: Implement with Supabase
+    console.log('Unban user:', userId);
+  };
+
+  const getBannedUsers = (): AuthUser[] => {
+    // TODO: Implement with Supabase
+    return [];
   };
 
   return (
     <AuthContext.Provider value={{ 
       user, 
+      session,
       login, 
       register, 
       logout, 
@@ -158,10 +216,4 @@ export const useAuth = () => {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-};
-
-// Helper hook to get all users (for admin panel)
-export const useUsers = () => {
-  const [users] = useState<User[]>(mockUsers);
-  return users;
 };

@@ -11,7 +11,6 @@ import Footer from "@/components/Footer";
 
 const Register = () => {
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -31,10 +30,19 @@ const Register = () => {
       return;
     }
 
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const success = await register(username, email, password);
+      const success = await register(username, password);
       if (success) {
         toast({
           title: "Success!",
@@ -44,7 +52,7 @@ const Register = () => {
       } else {
         toast({
           title: "Error",
-          description: "Username or email already exists.",
+          description: "Username already exists or registration failed.",
           variant: "destructive",
         });
       }
@@ -82,18 +90,6 @@ const Register = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Choose a username"
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email address</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
                 />
               </div>
               <div>
