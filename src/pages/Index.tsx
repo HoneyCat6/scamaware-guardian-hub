@@ -1,11 +1,28 @@
-
 import { Shield, Users, BookOpen, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
 const Index = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleJoinCommunity = () => {
+    if (user) {
+      toast({
+        title: "Already a member",
+        description: "You're already part of our community!",
+      });
+      navigate("/forums");
+    } else {
+      navigate("/register");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-800 to-blue-600">
       <Header />
@@ -26,14 +43,16 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/news">
                 <Button size="lg" className="bg-white text-blue-800 hover:bg-gray-100 px-8 py-3 text-lg">
-                  Latest Scam Alerts
+                  Latest Scam News
                 </Button>
               </Link>
-              <Link to="/register">
-                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-blue-800 px-8 py-3 text-lg">
-                  Join Community
-                </Button>
-              </Link>
+              <Button 
+                size="lg" 
+                className="bg-white text-blue-800 hover:bg-gray-100 px-8 py-3 text-lg"
+                onClick={handleJoinCommunity}
+              >
+                {user ? "Go to Forums" : "Join Community"}
+              </Button>
             </div>
           </div>
         </div>
@@ -57,7 +76,7 @@ const Index = () => {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <AlertTriangle className="w-8 h-8 text-blue-600" />
               </div>
-              <h4 className="text-2xl font-bold text-gray-800 mb-4">Latest Scam Alerts</h4>
+              <h4 className="text-2xl font-bold text-gray-800 mb-4">Latest Scam News</h4>
               <p className="text-gray-600 leading-relaxed">
                 Stay updated with the latest scam trends, tactics, and prevention strategies. Our news hub keeps you informed about emerging threats.
               </p>

@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,21 +48,14 @@ const ForumNavigation = ({
           </Button>
         )}
       </div>
-      <div className="flex gap-2">
-        <Link to="/forums/recent">
-          <Button variant="outline">
-            View All Recent
+      {canCreateThreads && (
+        <Link to="/forums/create-thread">
+          <Button className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            New Thread
           </Button>
         </Link>
-        {canCreateThreads && (
-          <Link to="/forums/create-thread">
-            <Button className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              New Thread
-            </Button>
-          </Link>
-        )}
-      </div>
+      )}
     </div>
   );
 };

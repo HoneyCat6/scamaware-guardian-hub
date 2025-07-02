@@ -1,37 +1,56 @@
-
 import { Users, MessageSquare, AlertTriangle, Shield } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminStats = () => {
   const { getBannedUsers } = useAuth();
-  const bannedUsers = getBannedUsers();
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [bannedUsers, setBannedUsers] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      // Fetch total users
+      const { count: total, error: totalError } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true });
+      if (!totalError) setTotalUsers(total ?? 0);
+      // Fetch banned users
+      const { count: banned, error: bannedError } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_banned', true);
+      if (!bannedError) setBannedUsers(banned ?? 0);
+    };
+    fetchStats();
+  }, []);
 
   const stats = [
     {
       title: "Total Users",
-      value: "1,234",
+      value: totalUsers !== null ? totalUsers.toString() : "-",
       icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-100"
     },
     {
       title: "Active Threads",
-      value: "456",
+      value: "N/A",
       icon: MessageSquare,
       color: "text-green-600",
       bgColor: "bg-green-100"
     },
     {
       title: "Reported Posts",
-      value: "12",
+      value: "N/A",
       icon: AlertTriangle,
       color: "text-orange-600",
       bgColor: "bg-orange-100"
     },
     {
       title: "Banned Users",
-      value: bannedUsers.length.toString(),
+      value: bannedUsers !== null ? bannedUsers.toString() : "-",
       icon: Shield,
       color: "text-red-600",
       bgColor: "bg-red-100"

@@ -1,151 +1,155 @@
-
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Edit, Trash2, Calendar, User } from "lucide-react";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Edit, Trash2, Calendar, User, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-interface Article {
-  id: number;
-  title: string;
-  content: string;
-  author: string;
-  publishedAt: string;
-  excerpt: string;
-}
-
-const mockArticles: Article[] = [
-  {
-    id: 1,
-    title: "New Phishing Campaign Targets Banking Customers",
-    content: `A sophisticated phishing campaign has been identified targeting customers of major banks across the country. Security researchers have discovered that scammers are using increasingly convincing fake websites and emails to steal banking credentials.
-
-## How the Scam Works
-
-The attackers send emails that appear to be from legitimate banks, warning customers about suspicious activity on their accounts. These emails contain links to fake banking websites that look nearly identical to the real ones.
-
-### Warning Signs to Watch For:
-
-1. **Urgent language**: Phrases like "Your account will be closed" or "Immediate action required"
-2. **Generic greetings**: Using "Dear Customer" instead of your actual name
-3. **Suspicious URLs**: Domain names that are slightly different from the real bank's website
-4. **Requests for sensitive information**: Legitimate banks never ask for passwords or PINs via email
-
-## How to Protect Yourself
-
-- Always type your bank's URL directly into your browser
-- Enable two-factor authentication on all banking accounts
-- Report suspicious emails to your bank immediately
-- Never click links in banking emails - go to the official website instead
-
-If you believe you may have fallen victim to this scam, contact your bank immediately and monitor your accounts closely for any unauthorized transactions.`,
-    author: "Security Team",
-    publishedAt: "2024-01-15",
-    excerpt: "Learn about the latest phishing tactics and how to protect yourself from banking scams."
-  },
-  {
-    id: 2,
-    title: "Romance Scams on Social Media Increase by 300%",
-    content: `Authorities report a significant increase in romance scams across social media platforms, with losses exceeding $500 million in the past year alone. These scams prey on people's emotions and desire for companionship.
-
-## The Anatomy of a Romance Scam
-
-Romance scammers create fake profiles on dating apps and social media platforms, often using stolen photos of attractive people. They spend weeks or months building emotional connections with their victims before asking for money.
-
-### Common Tactics Include:
-
-- **Professing love quickly**: Saying "I love you" within days or weeks
-- **Avoiding phone calls or video chats**: Making excuses to avoid real-time communication
-- **Having a tragic backstory**: Claims of being widowed, in the military, or working overseas
-- **Financial emergencies**: Sudden needs for money due to medical bills, travel costs, or business problems
-
-## Red Flags to Watch For
-
-1. **Too good to be true**: Professional model photos and perfect life story
-2. **Poor grammar**: Inconsistent language use that doesn't match their claimed background
-3. **Requests for money**: Any request for financial assistance is a major red flag
-4. **Unwillingness to meet**: Constant excuses for why they can't meet in person
-
-## Protecting Yourself
-
-- Never send money, gifts, or personal information to someone you've only met online
-- Use reverse image searches to check if profile photos are stolen
-- Be suspicious of anyone who quickly professes love or asks to move conversations off the platform
-- Trust your instincts - if something feels wrong, it probably is
-
-If you believe you're being targeted by a romance scammer, report them to the platform and consider contacting local authorities.`,
-    author: "Research Team",
-    publishedAt: "2024-01-12",
-    excerpt: "Understanding the warning signs of romance scams and how to stay safe while dating online."
-  },
-  {
-    id: 3,
-    title: "Cryptocurrency Investment Scams: What to Watch For",
-    content: `As cryptocurrency gains popularity, scammers are developing new ways to exploit investors. From fake investment platforms to celebrity endorsement scams, the crypto space has become a hotbed for fraudulent activities.
-
-## Types of Crypto Scams
-
-### 1. Fake Investment Platforms
-Scammers create professional-looking websites that promise high returns on cryptocurrency investments. These platforms may show fake trading activity and profits to convince victims to invest more money.
-
-### 2. Celebrity Endorsement Scams
-Fraudsters use deepfakes or hacked social media accounts to make it appear that celebrities are endorsing specific cryptocurrency investments or giveaways.
-
-### 3. Pump and Dump Schemes
-Groups coordinate to artificially inflate the price of a lesser-known cryptocurrency before selling their holdings, leaving other investors with worthless tokens.
-
-## Warning Signs
-
-- **Guaranteed returns**: No legitimate investment can guarantee profits
-- **Pressure to act quickly**: Scammers create urgency to prevent victims from researching
-- **Celebrity endorsements**: Be suspicious of any celebrity promoting specific crypto investments
-- **Requests for private keys**: Never share your wallet's private keys or seed phrases
-
-## How to Protect Yourself
-
-1. **Research thoroughly**: Investigate any investment opportunity before committing funds
-2. **Use reputable exchanges**: Stick to well-known, regulated cryptocurrency exchanges
-3. **Be skeptical of social media ads**: Don't trust investment advice from social media advertisements
-4. **Secure your wallet**: Use hardware wallets and never share private keys
-5. **Start small**: Only invest what you can afford to lose
-
-Remember: if an investment opportunity sounds too good to be true, it probably is. Take time to research and consult with financial advisors before making significant investments in cryptocurrency.`,
-    author: "Crypto Analyst",
-    publishedAt: "2024-01-10",
-    excerpt: "Essential tips for identifying and avoiding cryptocurrency investment scams."
-  }
-];
+type ArticleType = Database["public"]["Tables"]["articles"]["Row"];
 
 const Article = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [article, setArticle] = useState<Article | null>(null);
+  const [article, setArticle] = useState<ArticleType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filteredIds, setFilteredIds] = useState<number[]>([]);
+  const currentIndex = id ? filteredIds.indexOf(Number(id)) : -1;
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const canEditArticle = user && (user.role === 'moderator' || user.role === 'admin');
 
+  // Fetch filtered articles based on URL params
+  useEffect(() => {
+    const fetchFilteredArticles = async () => {
+      const { data: articles } = await supabase.from("articles").select("id, title, content, excerpt, author, category, published_at");
+      if (!articles) return;
+
+      let filtered = articles;
+      const search = searchParams.get("search")?.toLowerCase();
+      const category = searchParams.get("category");
+      const sort = searchParams.get("sort") || "Newest";
+
+      // Apply filters
+      if (search || category) {
+        filtered = articles.filter(article => {
+          const matchesSearch = !search || 
+            article.title.toLowerCase().includes(search) ||
+            article.content.toLowerCase().includes(search) ||
+            article.excerpt.toLowerCase().includes(search) ||
+            article.author.toLowerCase().includes(search);
+          const matchesCategory = !category || category === "All" || article.category === category;
+          return matchesSearch && matchesCategory;
+        });
+      }
+
+      // Apply sort
+      filtered.sort((a, b) => {
+        const dateA = new Date(a.published_at || 0).getTime();
+        const dateB = new Date(b.published_at || 0).getTime();
+        return sort === "Newest" ? dateB - dateA : dateA - dateB;
+      });
+
+      setFilteredIds(filtered.map(article => article.id));
+    };
+
+    fetchFilteredArticles();
+  }, [searchParams]);
+
   useEffect(() => {
     if (id) {
-      const foundArticle = mockArticles.find(a => a.id === parseInt(id));
-      setArticle(foundArticle || null);
+      setLoading(true);
+      setError(null);
+      supabase
+        .from("articles")
+        .select("*")
+        .eq("id", Number(id))
+        .single()
+        .then(({ data, error }) => {
+          if (error || !data) {
+            setError("Article not found.");
+            setArticle(null);
+          } else {
+            setArticle(data);
+          }
+          setLoading(false);
+        });
     }
   }, [id]);
 
-  const handleDeleteArticle = () => {
-    if (article) {
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!article) return;
+
+    try {
+      const { error } = await supabase
+        .from("articles")
+        .delete()
+        .eq("id", article.id);
+
+      if (error) throw error;
+
       toast({
         title: "Article deleted",
         description: "The article has been successfully removed.",
       });
       navigate("/news");
+    } catch (error) {
+      console.error('Error deleting article:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete article.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
     }
   };
 
-  if (!article) {
+  const navigateToArticle = (direction: 'prev' | 'next') => {
+    if (currentIndex === -1) return;
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex >= 0 && newIndex < filteredIds.length) {
+      navigate(`/article/${filteredIds[newIndex]}?${searchParams.toString()}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <span className="text-gray-500">Loading article...</span>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !article) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -169,15 +173,38 @@ const Article = () => {
       
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          {/* Back button and actions */}
+          {/* Navigation controls */}
           <div className="flex justify-between items-center mb-6">
-            <Link to="/news">
-              <Button variant="outline" className="flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back to News
-              </Button>
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link to={`/news?${searchParams.toString()}`}>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to News
+                </Button>
+              </Link>
+            </div>
             
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => navigateToArticle('prev')}
+                disabled={currentIndex <= 0}
+                className="flex items-center gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigateToArticle('next')}
+                disabled={currentIndex === -1 || currentIndex >= filteredIds.length - 1}
+                className="flex items-center gap-1"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+
             {canEditArticle && (
               <div className="flex gap-2">
                 <Link to={`/edit-article/${article.id}`}>
@@ -186,15 +213,36 @@ const Article = () => {
                     Edit
                   </Button>
                 </Link>
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  onClick={handleDeleteArticle}
-                  className="flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </Button>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Article</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete this article? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteConfirm}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        Delete Article
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             )}
           </div>
@@ -213,7 +261,7 @@ const Article = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  <span>{new Date(article.publishedAt).toLocaleDateString('en-US', {
+                  <span>{new Date(article.published_at).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'

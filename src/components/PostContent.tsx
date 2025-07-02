@@ -1,5 +1,8 @@
+import type { Database } from "@/integrations/supabase/types";
 
-import { Post } from "@/data/threadData";
+type Post = Database["public"]["Tables"]["posts"]["Row"] & {
+  author: { username: string };
+};
 
 interface PostContentProps {
   post: Post;

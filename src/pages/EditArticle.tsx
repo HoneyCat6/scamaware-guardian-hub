@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
@@ -11,42 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Link, Navigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
 
-interface Article {
-  id: number;
-  title: string;
-  content: string;
-  author: string;
-  publishedAt: string;
-  excerpt: string;
-}
-
-const mockArticles: Article[] = [
-  {
-    id: 1,
-    title: "New Phishing Campaign Targets Banking Customers",
-    content: "A sophisticated phishing campaign has been identified targeting customers of major banks...",
-    author: "Security Team",
-    publishedAt: "2024-01-15",
-    excerpt: "Learn about the latest phishing tactics and how to protect yourself from banking scams."
-  },
-  {
-    id: 2,
-    title: "Romance Scams on Social Media Increase by 300%",
-    content: "Authorities report a significant increase in romance scams across social media platforms...",
-    author: "Research Team",
-    publishedAt: "2024-01-12",
-    excerpt: "Understanding the warning signs of romance scams and how to stay safe while dating online."
-  },
-  {
-    id: 3,
-    title: "Cryptocurrency Investment Scams: What to Watch For",
-    content: "As cryptocurrency gains popularity, scammers are developing new ways to exploit investors...",
-    author: "Crypto Analyst",
-    publishedAt: "2024-01-10",
-    excerpt: "Essential tips for identifying and avoiding cryptocurrency investment scams."
-  }
-];
+type Article = Database['public']['Tables']['articles']['Row'];
 
 const EditArticle = () => {
   const { id } = useParams<{ id: string }>();
@@ -58,7 +25,8 @@ const EditArticle = () => {
   const [formData, setFormData] = useState({
     title: "",
     excerpt: "",
-    content: ""
+    content: "",
+    category: ""
   });
 
   // Redirect if not moderator or admin
@@ -67,26 +35,56 @@ const EditArticle = () => {
   }
 
   useEffect(() => {
-    if (id) {
-      const foundArticle = mockArticles.find(a => a.id === parseInt(id));
-      if (foundArticle) {
-        setArticle(foundArticle);
-        setFormData({
-          title: foundArticle.title,
-          excerpt: foundArticle.excerpt,
-          content: foundArticle.content
+    const fetchArticle = async () => {
+      if (!id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('articles')
+          .select('*')
+          .eq('id', parseInt(id))
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setArticle(data);
+          setFormData({
+            title: data.title,
+            excerpt: data.excerpt,
+            content: data.content,
+            category: data.category
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching article:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load article. Please try again.",
+          variant: "destructive",
         });
       }
-    }
-  }, [id]);
+    };
+
+    fetchArticle();
+  }, [id, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase
+        .from('articles')
+        .update({
+          title: formData.title,
+          excerpt: formData.excerpt,
+          content: formData.content,
+          category: formData.category
+        })
+        .eq('id', parseInt(id!));
+
+      if (error) throw error;
       
       toast({
         title: "Article updated!",
@@ -95,6 +93,7 @@ const EditArticle = () => {
       
       navigate(`/article/${id}`);
     } catch (error) {
+      console.error('Error updating article:', error);
       toast({
         title: "Error",
         description: "Failed to update article. Please try again.",
@@ -161,6 +160,19 @@ const EditArticle = () => {
                   value={formData.title}
                   onChange={handleInputChange}
                   placeholder="Enter article title"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <Input
+                  id="category"
+                  name="category"
+                  type="text"
+                  required
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  placeholder="Enter article category"
                 />
               </div>
 

@@ -1,6 +1,5 @@
-
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,24 +12,44 @@ import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Link, Navigate } from "react-router-dom";
-
-const categories = [
-  { id: "scam-reports", name: "Scam Reports" },
-  { id: "prevention-tips", name: "Prevention Tips" },
-  { id: "support-recovery", name: "Support & Recovery" },
-  { id: "general-discussion", name: "General Discussion" }
-];
+import { supabase } from "@/integrations/supabase/client";
 
 const CreateThread = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [formData, setFormData] = useState({
     title: "",
-    category: "",
+    category_id: searchParams.get("category") || "",
     content: ""
   });
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("categories")
+          .select("id, name")
+          .order("name");
+
+        if (error) throw error;
+        setCategories(data || []);
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load categories. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchCategories();
+  }, [toast]);
 
   // Redirect if not logged in
   if (!user) {
@@ -42,16 +61,32 @@ const CreateThread = () => {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Create the thread
+      const { data: thread, error: threadError } = await supabase
+        .from("threads")
+        .insert({
+          title: formData.title,
+          content: formData.content,
+          category_id: parseInt(formData.category_id),
+          author_id: user.id,
+          is_pinned: false,
+          is_locked: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (threadError) throw threadError;
       
       toast({
         title: "Thread created!",
         description: "Your discussion thread has been posted successfully.",
       });
       
-      navigate("/forums");
+      navigate(`/forums/thread/${thread.id}`);
     } catch (error) {
+      console.error("Error creating thread:", error);
       toast({
         title: "Error",
         description: "Failed to create thread. Please try again.",
@@ -73,7 +108,7 @@ const CreateThread = () => {
   const handleCategoryChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
-      category: value
+      category_id: value
     }));
   };
 
@@ -111,18 +146,20 @@ const CreateThread = () => {
                     value={formData.title}
                     onChange={handleInputChange}
                     placeholder="Enter a clear, descriptive title"
+                    minLength={5}
+                    maxLength={200}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select value={formData.category} onValueChange={handleCategoryChange} required>
+                  <Label htmlFor="category_id">Category</Label>
+                  <Select value={formData.category_id.toString()} onValueChange={handleCategoryChange} required>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
+                        <SelectItem key={category.id} value={category.id.toString()}>
                           {category.name}
                         </SelectItem>
                       ))}
@@ -140,6 +177,8 @@ const CreateThread = () => {
                     onChange={handleInputChange}
                     placeholder="Share your experience, ask a question, or start a discussion..."
                     rows={12}
+                    minLength={20}
+                    maxLength={10000}
                   />
                 </div>
 

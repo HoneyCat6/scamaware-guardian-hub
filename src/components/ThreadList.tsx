@@ -1,9 +1,8 @@
-
 import { Link } from "react-router-dom";
 import { MessageSquare, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Thread } from "@/data/threadData";
+import type { Database } from "@/integrations/supabase/types";
 import ThreadCard from "./ThreadCard";
 import {
   Pagination,
@@ -14,6 +13,13 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+
+type DatabaseThread = Database["public"]["Tables"]["threads"]["Row"];
+
+interface Thread extends DatabaseThread {
+  author: { username: string };
+  posts: { count: number }[];
+}
 
 interface ThreadListProps {
   threads: Thread[];
@@ -59,7 +65,7 @@ const ThreadList = ({
             }
           </p>
           {canCreateThreads && (
-            <Link to="/forums/create-thread">
+            <Link to={selectedCategory ? `/forums/create-thread?category=${selectedCategory}` : "/forums/create-thread"}>
               <Button className="flex items-center gap-2">
                 <Plus className="w-4 h-4" />
                 Start the First Discussion
@@ -161,16 +167,25 @@ const ThreadList = ({
 
   return (
     <div className="space-y-6">
-      {selectedCategory && (
-        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-          <h2 className="text-xl font-semibold text-gray-900 mb-1">
-            {selectedCategoryName} Discussions
-          </h2>
-          <p className="text-gray-600">
-            Showing page {currentPage} of {totalPages} ({threads.length} thread{threads.length !== 1 ? 's' : ''} from the {selectedCategoryName} category)
-          </p>
-        </div>
-      )}
+      <div className="flex items-center justify-between mb-6">
+        {selectedCategory ? (
+          <div className="p-4 bg-blue-50 rounded-lg flex-1">
+            <h2 className="text-xl font-semibold text-gray-900 mb-1">
+              {selectedCategoryName} Discussions
+            </h2>
+            <p className="text-gray-600">
+              Showing page {currentPage} of {totalPages} ({threads.length} thread{threads.length !== 1 ? 's' : ''} from the {selectedCategoryName} category)
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1">
+            <h2 className="text-xl font-semibold text-gray-900 mb-1">Recent Discussions</h2>
+            <p className="text-gray-600">
+              Showing page {currentPage} of {totalPages} ({threads.length} thread{threads.length !== 1 ? 's' : ''})
+            </p>
+          </div>
+        )}
+      </div>
       
       <div className="space-y-4">
         {threads.map((thread) => (
@@ -205,13 +220,6 @@ const ThreadList = ({
               </PaginationItem>
             </PaginationContent>
           </Pagination>
-        </div>
-      )}
-
-      {/* Page Info */}
-      {totalPages > 1 && (
-        <div className="text-center text-sm text-gray-500 mt-4">
-          Page {currentPage} of {totalPages}
         </div>
       )}
     </div>

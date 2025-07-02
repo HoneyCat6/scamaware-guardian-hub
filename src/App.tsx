@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +17,7 @@ import RecentThreads from "./pages/RecentThreads";
 import ForumThread from "./pages/ForumThread";
 import CreateThread from "./pages/CreateThread";
 import AdminPanel from "./pages/AdminPanel";
+import ModeratorPanel from "./pages/ModeratorPanel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +56,11 @@ const App = () => (
             <Route path="/admin" element={
               <ProtectedRoute requiredRole="admin">
                 <AdminPanel />
+              </ProtectedRoute>
+            } />
+            <Route path="/moderator" element={
+              <ProtectedRoute requiredRole="moderator">
+                <ModeratorPanel />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

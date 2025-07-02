@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,38 +10,109 @@ import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Link, Navigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Database } from "@/integrations/supabase/types";
+
+type ArticleStatus = Database['public']['Tables']['articles']['Row']['status'];
+
+const CATEGORIES = [
+  "Shopping",
+  "Employment",
+  "Investment",
+  "Software",
+  "Education",
+  "Social Media",
+  "Cryptocurrency",
+  "Travel",
+  "Charity",
+  "Marketplace",
+  "Business",
+  "Events",
+  "Delivery",
+  "Tech Support",
+  "Survey",
+  "Housing",
+  "Phishing"
+];
 
 const CreateArticle = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [username, setUsername] = useState<string>("");
   const [formData, setFormData] = useState({
     title: "",
     excerpt: "",
-    content: ""
+    content: "",
+    category: CATEGORIES[0],
+    hideAuthor: false
   });
 
-  // Redirect if not moderator or admin
-  if (!user || (user.role !== 'moderator' && user.role !== 'admin')) {
-    return <Navigate to="/news" replace />;
+  // Fetch username on component mount
+  useEffect(() => {
+    const fetchUsername = async () => {
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+        
+        if (data?.username) {
+          setUsername(data.username);
+        }
+      }
+    };
+    fetchUsername();
+  }, [user]);
+
+  // Redirect if not logged in
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
+
+  const isAdminOrModerator = user.role === 'admin' || user.role === 'moderator';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Prepare the article data
+      const now = new Date().toISOString();
+      const status = (isAdminOrModerator ? "approved" : "pending") as ArticleStatus;
+      
+      const articleData = {
+        title: formData.title,
+        excerpt: formData.excerpt,
+        content: formData.content,
+        category: formData.category,
+        author: formData.hideAuthor ? "Anonymous" : username,
+        author_id: user.id,
+        status: status,
+        // Only set published_at if the article is being approved
+        published_at: status === "approved" ? now : undefined
+      };
+
+      // Insert the article
+      const { error } = await supabase
+        .from("articles")
+        .insert([articleData]);
+
+      if (error) throw error;
       
       toast({
-        title: "Article created!",
-        description: "Your article has been published successfully.",
+        title: isAdminOrModerator ? "Article published!" : "Article submitted for review!",
+        description: isAdminOrModerator 
+          ? "Your article has been published successfully."
+          : "Your article will be reviewed by a moderator before being published.",
       });
       
       navigate("/news");
     } catch (error) {
+      console.error('Error creating article:', error);
       toast({
         title: "Error",
         description: "Failed to create article. Please try again.",
@@ -53,7 +123,9 @@ const CreateArticle = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -80,6 +152,12 @@ const CreateArticle = () => {
 
           {/* Form */}
           <div className="bg-white rounded-lg shadow-lg p-8">
+            {!isAdminOrModerator && (
+              <div className="mb-6 p-4 bg-blue-50 text-blue-700 rounded-lg">
+                <p>Your article will be reviewed by a moderator before being published.</p>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="title">Article Title</Label>
@@ -92,6 +170,22 @@ const CreateArticle = () => {
                   onChange={handleInputChange}
                   placeholder="Enter article title"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <select
+                  id="category"
+                  name="category"
+                  required
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border rounded-md text-gray-700 bg-white"
+                >
+                  {CATEGORIES.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
@@ -120,30 +214,22 @@ const CreateArticle = () => {
                 />
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-blue-900 mb-2">Formatting Tips:</h3>
-                <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Use ## for main headings</li>
-                  <li>• Use ### for subheadings</li>
-                  <li>• Use numbered lists (1. 2. 3.) or bullet points (- item)</li>
-                  <li>• Separate paragraphs with empty lines</li>
-                </ul>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="hideAuthor"
+                  checked={formData.hideAuthor}
+                  onCheckedChange={(checked) => 
+                    setFormData(prev => ({ ...prev, hideAuthor: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="hideAuthor">Hide author name from article</Label>
               </div>
 
-              <div className="flex gap-4">
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex items-center gap-2"
-                >
+              <div className="flex justify-end">
+                <Button type="submit" disabled={isLoading} className="flex items-center gap-2">
                   <Save className="w-4 h-4" />
-                  {isLoading ? "Publishing..." : "Publish Article"}
+                  {isLoading ? "Saving..." : isAdminOrModerator ? "Publish Article" : "Submit for Review"}
                 </Button>
-                <Link to="/news">
-                  <Button type="button" variant="outline">
-                    Cancel
-                  </Button>
-                </Link>
               </div>
             </form>
           </div>

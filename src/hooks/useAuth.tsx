@@ -16,7 +16,7 @@ interface AuthContextType {
   user: AuthUser | null;
   session: Session | null;
   login: (username: string, password: string) => Promise<boolean>;
-  register: (username: string, password: string) => Promise<boolean>;
+  register: (username: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateUserRole: (userId: string, newRole: 'user' | 'moderator' | 'admin') => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
@@ -147,31 +147,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const register = async (username: string, password: string): Promise<boolean> => {
+  const register = async (username: string, email: string, password: string): Promise<boolean> => {
     try {
-      console.log('Attempting registration for username:', username);
-      
+      console.log('Attempting registration for username:', username, 'email:', email);
       // Check if username already exists
       const { data: existingUser, error: checkError } = await supabase
         .from('profiles')
         .select('username')
         .eq('username', username)
         .maybeSingle();
-
       console.log('Username check result:', existingUser, 'Error:', checkError);
-
       if (existingUser) {
         console.log('Username already taken');
         return false;
       }
-
-      // Create email using a more reliable domain
-      const tempEmail = `${username}@temp-scamaware.net`;
-      console.log('Using email:', tempEmail);
-
-      // Sign up with email
+      // Sign up with real email
       const { data, error } = await supabase.auth.signUp({
-        email: tempEmail,
+        email: email,
         password: password,
         options: {
           data: {
@@ -180,20 +172,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           emailRedirectTo: `${window.location.origin}/`
         }
       });
-
       console.log('Sign up result:', data, 'Error:', error);
-
       if (error) {
         console.log('Registration failed:', error);
         return false;
       }
-
       if (data.user && !data.session) {
         // User created but needs email confirmation
         console.log('User created, waiting for confirmation');
         return true;
       }
-
       return !!data.user;
     } catch (error) {
       console.error('Registration error:', error);
@@ -233,20 +221,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteUser = async (userId: string) => {
-    try {
-      // In a real implementation, you'd need admin API access to delete auth users
-      // For now, just mark as deleted or ban
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_banned: true, banned_at: new Date().toISOString() })
-        .eq('id', userId);
-      
-      if (error) throw error;
-      console.log('User deleted/banned successfully');
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      throw error;
-    }
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', userId);
+    if (error) throw error;
   };
 
   const banUser = async (userId: string, bannedBy: string) => {

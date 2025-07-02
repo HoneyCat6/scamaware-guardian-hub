@@ -1,10 +1,16 @@
-
 import { Link } from "react-router-dom";
 import { MessageSquare, Clock, User, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Thread } from "@/data/threadData";
+import type { Database } from "@/integrations/supabase/types";
+
+type DatabaseThread = Database["public"]["Tables"]["threads"]["Row"];
+
+interface Thread extends DatabaseThread {
+  author: { username: string };
+  posts: { count: number }[];
+}
 
 interface ThreadCardProps {
   thread: Thread;
@@ -19,14 +25,16 @@ const ThreadCard = ({ thread, canModerate, formatTimeAgo }: ThreadCardProps) => 
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-3">
-              {thread.isPinned && (
+              {thread.is_pinned && (
                 <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
                   📌 Pinned
                 </Badge>
               )}
-              <Badge variant="outline" className="text-xs">
-                {thread.category}
-              </Badge>
+              {thread.is_locked && (
+                <Badge variant="secondary" className="text-xs bg-red-100 text-red-800">
+                  🔒 Locked
+                </Badge>
+              )}
               {canModerate && (
                 <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
                   Mod Tools
@@ -44,15 +52,15 @@ const ThreadCard = ({ thread, canModerate, formatTimeAgo }: ThreadCardProps) => 
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <User className="w-4 h-4" />
-                <span>{thread.author}</span>
+                <span>{thread.author.username}</span>
               </div>
               <div className="flex items-center gap-1">
                 <MessageSquare className="w-4 h-4" />
-                <span>{thread.posts.length} {thread.posts.length === 1 ? 'reply' : 'replies'}</span>
+                <span>{thread.posts[0]?.count || 0} {thread.posts[0]?.count === 1 ? 'reply' : 'replies'}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="w-4 h-4" />
-                <span>{formatTimeAgo(thread.createdAt)}</span>
+                <span>{formatTimeAgo(thread.created_at)}</span>
               </div>
             </div>
           </div>

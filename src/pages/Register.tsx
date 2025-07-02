@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import Footer from "@/components/Footer";
 
 const Register = () => {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -27,10 +27,19 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!username.trim() || !password.trim() || !confirmPassword.trim()) {
+    if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       toast({
         title: "Error",
         description: "Please fill in all fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address.",
         variant: "destructive",
       });
       return;
@@ -66,7 +75,7 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      const success = await register(username.trim(), password);
+      const success = await register(username.trim(), email.trim(), password);
       if (success) {
         toast({
           title: "Success!",
@@ -76,7 +85,7 @@ const Register = () => {
       } else {
         toast({
           title: "Error",
-          description: "Username already exists or registration failed. Please try a different username.",
+          description: "Username or email already exists or registration failed. Please try a different username/email.",
           variant: "destructive",
         });
       }
@@ -115,6 +124,19 @@ const Register = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Choose a username (min 3 characters)"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email address"
                   disabled={isLoading}
                 />
               </div>

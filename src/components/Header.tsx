@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Shield } from "lucide-react";
@@ -56,6 +55,14 @@ const Header = () => {
                     className={`text-gray-700 hover:text-blue-600 transition-colors ${isActive('/admin') ? 'text-blue-600 font-semibold' : ''}`}
                   >
                     Admin Panel
+                  </Link>
+                )}
+                {user.role === 'moderator' && (
+                  <Link 
+                    to="/moderator" 
+                    className={`text-gray-700 hover:text-blue-600 transition-colors ${isActive('/moderator') ? 'text-blue-600 font-semibold' : ''}`}
+                  >
+                    Moderator Panel
                   </Link>
                 )}
                 <span className="text-sm text-gray-600">
@@ -121,6 +128,15 @@ const Header = () => {
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Admin Panel
+                    </Link>
+                  )}
+                  {user.role === 'moderator' && (
+                    <Link 
+                      to="/moderator" 
+                      className="text-gray-700 hover:text-blue-600 transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Moderator Panel
                     </Link>
                   )}
                   <span className="text-sm text-gray-600">

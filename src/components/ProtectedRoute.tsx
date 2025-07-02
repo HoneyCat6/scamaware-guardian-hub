@@ -1,11 +1,12 @@
-
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, useLocation } from "react-router-dom";
 import { ReactNode } from "react";
 
+type UserRole = 'user' | 'moderator' | 'admin';
+
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: 'user' | 'moderator' | 'admin';
+  requiredRole?: UserRole | UserRole[];
 }
 
 const ProtectedRoute = ({ children, requiredRole = 'user' }: ProtectedRouteProps) => {
@@ -26,10 +27,18 @@ const ProtectedRoute = ({ children, requiredRole = 'user' }: ProtectedRouteProps
   if (requiredRole && user?.role) {
     const roleHierarchy = { user: 0, moderator: 1, admin: 2 };
     const userLevel = roleHierarchy[user.role];
-    const requiredLevel = roleHierarchy[requiredRole];
-    
-    if (userLevel < requiredLevel) {
-      return <Navigate to="/" replace />;
+
+    if (Array.isArray(requiredRole)) {
+      // Check if user's role is in the array of allowed roles
+      if (!requiredRole.includes(user.role)) {
+        return <Navigate to="/" replace />;
+      }
+    } else {
+      // Single role check using hierarchy
+      const requiredLevel = roleHierarchy[requiredRole];
+      if (userLevel < requiredLevel) {
+        return <Navigate to="/" replace />;
+      }
     }
   }
 
