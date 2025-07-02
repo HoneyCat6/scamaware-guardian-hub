@@ -1,48 +1,123 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CheckCircle, XCircle, Eye, Ban } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { threadData, Post } from "@/data/threadData";
+import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
+
+type Tables = Database['public']['Tables'];
+
+type ReportedPost = {
+  id: number;
+  content: string;
+  author_id: string;
+  author: {
+    username: string;
+  };
+  created_at: string;
+  thread_id: number;
+  thread: {
+    title: string;
+  };
+  report_count: number;
+};
+
+type SupabaseResponse = {
+  id: number;
+  content: string;
+  created_at: string;
+  author_id: string;
+  author: {
+    username: string;
+  };
+  thread_id: number;
+  thread: {
+    title: string;
+  };
+  report_count: number;
+};
 
 const ReportedPostsList = () => {
   const { toast } = useToast();
-  const { user, banUser } = useAuth();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [reportedPosts, setReportedPosts] = useState<ReportedPost[]>([]);
 
-  const getReportedPosts = () => {
-    const reportedPosts: Array<Post & { threadId: number; threadTitle: string }> = [];
-    
-    Object.values(threadData).forEach(thread => {
-      thread.posts.forEach(post => {
-        if (post.isReported) {
-          reportedPosts.push({
-            ...post,
-            threadId: thread.id,
-            threadTitle: thread.title
-          });
-        }
+  useEffect(() => {
+    fetchReportedPosts();
+  }, []);
+
+  const fetchReportedPosts = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          id,
+          content,
+          created_at,
+          author_id,
+          author:profiles!posts_author_id_fkey(username),
+          thread_id,
+          thread:threads!posts_thread_id_fkey(title),
+          report_count
+        `)
+        .gt('report_count', 0)
+        .order('report_count', { ascending: false });
+
+      if (error) throw error;
+      
+      // Transform the data to match our ReportedPost type
+      const transformedPosts = (data as unknown as SupabaseResponse[]).map(post => ({
+        id: post.id,
+        content: post.content,
+        author_id: post.author_id,
+        author: post.author,
+        created_at: post.created_at,
+        thread_id: post.thread_id,
+        thread: post.thread,
+        report_count: post.report_count
+      }));
+
+      setReportedPosts(transformedPosts);
+    } catch (err) {
+      console.error('Error fetching reported posts:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load reported posts.",
+        variant: "destructive",
       });
-    });
-    
-    return reportedPosts.sort((a, b) => b.reportCount - a.reportCount);
+    } finally {
+      setIsLoading(false);
+    }
   };
-
-  const reportedPosts = getReportedPosts();
 
   const handleApprovePost = async (postId: number) => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { error } = await supabase
+        .from('posts')
+        .update({ 
+          report_count: 0,
+          is_reported: false,
+          reviewed_at: new Date().toISOString(),
+          reviewer_id: user?.id
+        })
+        .eq('id', postId);
+
+      if (error) throw error;
       
       toast({
         title: "Post approved",
         description: "The reported post has been reviewed and approved.",
       });
       
-      console.log(`Approved post ${postId}`);
+      // Refresh the list
+      fetchReportedPosts();
     } catch (err) {
       toast({
         title: "Error",
@@ -57,14 +132,21 @@ const ReportedPostsList = () => {
   const handleRemovePost = async (postId: number) => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId);
+
+      if (error) throw error;
       
       toast({
         title: "Post removed",
         description: "The reported post has been removed from the forum.",
       });
       
-      console.log(`Removed post ${postId}`);
+      // Refresh the list
+      fetchReportedPosts();
     } catch (err) {
       toast({
         title: "Error",
@@ -76,23 +158,30 @@ const ReportedPostsList = () => {
     }
   };
 
-  const handleBanUser = async (username: string) => {
+  const handleBanUser = async (userId: string, username: string) => {
     if (!user) return;
     
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Generate a UUID-like string for the mock user ID
-      const userId = `user-${Math.random().toString(36).substr(2, 9)}`;
-      banUser(userId, user.username);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_banned: true,
+          banned_at: new Date().toISOString(),
+          banned_by: user.id
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
       
       toast({
         title: "User banned",
         description: `User ${username} has been banned from the forum.`,
       });
       
-      console.log(`Banned user ${username} by ${user.username}`);
+      // Refresh the list
+      fetchReportedPosts();
     } catch (err) {
       toast({
         title: "Error",
@@ -104,6 +193,18 @@ const ReportedPostsList = () => {
     }
   };
 
+  if (isLoading && reportedPosts.length === 0) {
+    return <div className="text-center py-8">Loading reported posts...</div>;
+  }
+
+  if (reportedPosts.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No reported posts to review.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {reportedPosts.map((post) => (
@@ -112,65 +213,22 @@ const ReportedPostsList = () => {
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-gray-900">{post.author}</span>
+                  <span className="font-semibold text-gray-900">{post.author.username}</span>
                   <Badge variant="outline" className="text-orange-600 border-orange-300">
-                    {post.reportCount} report{post.reportCount !== 1 ? 's' : ''}
+                    {post.report_count} report{post.report_count !== 1 ? 's' : ''}
                   </Badge>
                 </div>
                 <p className="text-sm text-gray-600 mb-1">
-                  Thread: <span className="font-medium">{post.threadTitle}</span>
+                  Thread: <span className="font-medium">{post.thread.title}</span>
                 </p>
-                <p className="text-sm text-gray-500">{post.createdAt}</p>
+                <p className="text-sm text-gray-500">
+                  {new Date(post.created_at).toLocaleString()}
+                </p>
               </div>
             </div>
             
             <div className="mb-4 p-3 bg-white rounded border">
               <p className="text-gray-700">{post.content}</p>
-            </div>
-            
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`/forums/thread/${post.threadId}`, '_blank')}
-                className="flex items-center gap-1"
-              >
-                <Eye className="w-4 h-4" />
-                View in Thread
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleApprovePost(post.id)}
-                disabled={isLoading}
-                className="flex items-center gap-1 text-green-600 border-green-300 hover:bg-green-50"
-              >
-                <CheckCircle className="w-4 h-4" />
-                Approve
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleRemovePost(post.id)}
-                disabled={isLoading}
-                className="flex items-center gap-1 text-red-600 border-red-300 hover:bg-red-50"
-              >
-                <XCircle className="w-4 h-4" />
-                Remove Post
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBanUser(post.author)}
-                disabled={isLoading}
-                className="flex items-center gap-1 text-red-600 border-red-300 hover:bg-red-50"
-              >
-                <Ban className="w-4 h-4" />
-                Ban User
-              </Button>
             </div>
           </CardContent>
         </Card>

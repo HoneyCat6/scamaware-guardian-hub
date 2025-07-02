@@ -19,6 +19,7 @@ import CreateThread from "./pages/CreateThread";
 import AdminPanel from "./pages/AdminPanel";
 import ModeratorPanel from "./pages/ModeratorPanel";
 import NotFound from "./pages/NotFound";
+import UserPanel from "./pages/UserPanel";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/news" element={<News />} />
+            <Route path="/news/:id" element={<Article />} />
             <Route path="/article/:id" element={<Article />} />
             <Route path="/create-article" element={
               <ProtectedRoute>
@@ -61,6 +63,11 @@ const App = () => (
             <Route path="/moderator" element={
               <ProtectedRoute requiredRole="moderator">
                 <ModeratorPanel />
+              </ProtectedRoute>
+            } />
+            <Route path="/user/panel" element={
+              <ProtectedRoute>
+                <UserPanel />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

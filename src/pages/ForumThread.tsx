@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -16,26 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
-
-type Thread = {
-  id: number;
-  title: string;
-  content: string;
-  author_id: string;
-  category_id: number;
-  is_pinned: boolean;
-  is_locked: boolean;
-  created_at: string;
-  updated_at: string;
-  author: { username: string };
-  category: { name: string };
-  _count: { posts: number };
-};
-
-type Post = Database["public"]["Tables"]["posts"]["Row"] & {
-  author: { username: string };
-};
+import type { Thread, Post } from "@/types/forum";
 
 const ForumThread = () => {
   const { id } = useParams();
@@ -50,6 +31,30 @@ const ForumThread = () => {
   // Convert string id to number
   const threadId = id ? parseInt(id, 10) : null;
   const canModerate = user && (user.role === 'moderator' || user.role === 'admin');
+
+  // Set initial content
+  useEffect(() => {
+    if (!thread && !isLoading) {
+      setThread({
+        id: 1,
+        title: "Welcome",
+        content: "Afiq punya content hello gaiss",
+        author_id: "1",
+        category_id: 1,
+        is_pinned: false,
+        is_locked: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        locked_at: null,
+        locked_by: null,
+        pinned_at: null,
+        pinned_by: null,
+        author: { username: "system" },
+        category: { name: "General" },
+        _count: { posts: 0 }
+      });
+    }
+  }, [thread, isLoading]);
 
   // Fetch thread and posts
   useEffect(() => {
@@ -86,6 +91,10 @@ const ForumThread = () => {
           is_locked: threadData.is_locked,
           created_at: threadData.created_at,
           updated_at: threadData.updated_at,
+          locked_at: threadData.locked_at,
+          locked_by: threadData.locked_by,
+          pinned_at: threadData.pinned_at,
+          pinned_by: threadData.pinned_by,
           author: { username: (threadData.author as any).username },
           category: { name: threadData.category.name },
           _count: { posts: threadData.posts[0].count || 0 }
@@ -94,14 +103,16 @@ const ForumThread = () => {
         setThread(transformedThread);
 
         // Fetch posts with authors
-        const { data: postsData, error: postsError } = await supabase
+        let query = supabase
           .from("posts")
           .select(`
             *,
             author:profiles(username)
           `)
           .eq("thread_id", threadId)
-          .eq("status", "active")
+          .eq("status", "active");
+
+        const { data: postsData, error: postsError } = await query
           .order("created_at", { ascending: true });
 
         if (postsError) throw postsError;
@@ -145,16 +156,18 @@ const ForumThread = () => {
           try {
             if (payload.eventType === "INSERT") {
               // Fetch the complete post data with author
-              const { data: newPost, error: postError } = await supabase
+              let query = supabase
                 .from("posts")
                 .select(`
                   *,
                   author:profiles(username)
                 `)
-                .eq("id", payload.new.id)
-                .single();
+                .eq("id", payload.new.id);
+
+              const { data: newPost, error: postError } = await query.single();
 
               if (postError) throw postError;
+              if (!newPost) return; // Skip if post is reported and user is not a moderator
 
               // Transform the new post to match our Post type
               const transformedPost: Post = {
@@ -267,8 +280,6 @@ const ForumThread = () => {
           author_id: user.id,
           content: content,
           status: "active",
-          is_reported: false,
-          report_count: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
@@ -286,61 +297,152 @@ const ForumThread = () => {
     }
   };
 
-  if (!threadId || isNaN(threadId)) {
+  const handleThreadUpdate = async () => {
+    if (!threadId) return;
+
+    try {
+      const { data: threadData, error: threadError } = await supabase
+        .from("threads")
+        .select(`
+          *,
+          author:profiles(username),
+          category:categories(name),
+          posts:posts(count)
+        `)
+        .eq("id", threadId)
+        .single();
+
+      if (threadError) throw threadError;
+      if (!threadData) throw new Error("Thread not found");
+
+      // Transform the data to match our Thread type
+      const transformedThread: Thread = {
+        id: threadData.id,
+        title: threadData.title,
+        content: threadData.content,
+        author_id: threadData.author_id,
+        category_id: threadData.category_id,
+        is_pinned: threadData.is_pinned,
+        is_locked: threadData.is_locked,
+        created_at: threadData.created_at,
+        updated_at: threadData.updated_at,
+        locked_at: threadData.locked_at,
+        locked_by: threadData.locked_by,
+        pinned_at: threadData.pinned_at,
+        pinned_by: threadData.pinned_by,
+        author: { username: (threadData.author as any).username },
+        category: { name: threadData.category.name },
+        _count: { posts: threadData.posts[0].count || 0 }
+      };
+
+      setThread(transformedThread);
+    } catch (err) {
+      console.error("Error updating thread data:", err);
+      toast({
+        title: "Error",
+        description: "Failed to update thread status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Set up real-time subscription for thread updates
+  useEffect(() => {
+    if (!threadId) return;
+
+    const threadSubscription = supabase
+      .channel('thread-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'threads',
+          filter: `id=eq.${threadId}`
+        },
+        (payload) => {
+          if (payload.eventType === "UPDATE" && thread) {
+            setThread(currentThread => ({
+              ...currentThread!,
+              ...payload.new,
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      threadSubscription.unsubscribe();
+    };
+  }, [threadId]);
+
+  if (!threadId) {
     return <InvalidThreadId />;
   }
 
+  if (error) {
+    return <ThreadErrorDisplay error={error} onDismiss={() => setError(null)} />;
+  }
+
   if (!thread) {
-    return isLoading ? <ThreadLoadingOverlay /> : <ThreadNotFound />;
+    return <ThreadNotFound />;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen flex flex-col">
       <Header />
-      
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 mb-6">
-            <Link to="/forums">
-              <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back to Forums
-              </Button>
-            </Link>
+      <main className="flex-1 container mx-auto px-4 py-8">
+        {canModerate && (
+          <div className="mb-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowModerationPanel(!showModerationPanel)}
+            >
+              Show Mod Tools
+            </Button>
           </div>
+        )}
+        
+        {showModerationPanel && canModerate && (
+          <ModerationPanel />
+        )}
 
-          {/* Error Display */}
-          {error && (
-            <ThreadErrorDisplay error={error} onDismiss={() => setError(null)} />
-          )}
+        <div className="max-w-4xl mx-auto">
+          {/* Back button */}
+          <Link to="/forums">
+            <Button variant="ghost" className="mb-4">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Forums
+            </Button>
+          </Link>
 
-          {/* Moderator Controls */}
+          {/* Thread header */}
+          <ThreadHeader thread={thread} />
+
+          {/* Moderator controls */}
           {canModerate && (
-            <ModeratorControls 
+            <ModeratorControls
               showModerationPanel={showModerationPanel}
               onToggleModerationPanel={() => setShowModerationPanel(!showModerationPanel)}
+              threadId={thread.id}
+              isPinned={thread.is_pinned}
+              isLocked={thread.is_locked}
+              onThreadUpdate={handleThreadUpdate}
             />
           )}
 
-          {/* Moderation Panel */}
-          {canModerate && showModerationPanel && (
-            <div className="mb-6">
-              <ModerationPanel />
+          {/* Thread content */}
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div className="prose max-w-none">
+              {thread.content}
             </div>
-          )}
-
-          {/* Thread Header */}
-          <ThreadHeader thread={thread} />
-
-          {/* Loading Overlay */}
-          {isLoading && <ThreadLoadingOverlay />}
+          </div>
 
           {/* Posts */}
-          <div className="space-y-4 mb-8">
+          <div className="space-y-6">
             {posts.map((post) => (
-              <ThreadPost 
-                key={post.id} 
+              <ThreadPost
+                key={post.id}
                 post={post}
                 onDelete={handleDeletePost}
                 onEdit={handleEditPost}
@@ -350,14 +452,23 @@ const ForumThread = () => {
             ))}
           </div>
 
-          {/* Reply Form */}
-          {!thread.is_locked && (
-            <ReplyForm onSubmit={handleSubmitReply} />
+          {/* Reply form */}
+          {user && thread && (
+            <div className="mt-6">
+              <ReplyForm
+                threadId={thread.id}
+                onReplySubmitted={handleThreadUpdate}
+                isThreadLocked={thread.is_locked}
+              />
+            </div>
           )}
         </div>
-      </div>
-      
+      </main>
+
       <Footer />
+
+      {/* Loading overlay */}
+      {isLoading && <ThreadLoadingOverlay />}
     </div>
   );
 };

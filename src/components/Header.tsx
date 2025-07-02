@@ -65,6 +65,12 @@ const Header = () => {
                     Moderator Panel
                   </Link>
                 )}
+                <Link 
+                  to="/user/panel" 
+                  className={`text-gray-700 hover:text-blue-600 transition-colors ${isActive('/user/panel') ? 'text-blue-600 font-semibold' : ''}`}
+                >
+                  My Profile
+                </Link>
                 <span className="text-sm text-gray-600">
                   Welcome, {user.username} ({user.role})
                 </span>
@@ -139,6 +145,13 @@ const Header = () => {
                       Moderator Panel
                     </Link>
                   )}
+                  <Link 
+                    to="/user/panel" 
+                    className="text-gray-700 hover:text-blue-600 transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    My Profile
+                  </Link>
                   <span className="text-sm text-gray-600">
                     Welcome, {user.username} ({user.role})
                   </span>

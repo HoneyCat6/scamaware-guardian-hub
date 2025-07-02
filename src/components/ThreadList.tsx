@@ -15,10 +15,13 @@ import {
 } from "@/components/ui/pagination";
 
 type DatabaseThread = Database["public"]["Tables"]["threads"]["Row"];
+type DatabasePost = Database["public"]["Tables"]["posts"]["Row"];
 
 interface Thread extends DatabaseThread {
   author: { username: string };
-  posts: { count: number }[];
+  posts: DatabasePost[];
+  last_post_at?: string;
+  is_reported?: boolean;
 }
 
 interface ThreadListProps {
@@ -198,29 +201,24 @@ const ThreadList = ({
         ))}
       </div>
 
-      {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex justify-center mt-8">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={onPreviousPage}
-                  className={`cursor-pointer ${!canGoPrevious ? 'opacity-50 cursor-not-allowed' : ''}`}
-                />
-              </PaginationItem>
-              
-              {renderPaginationItems()}
-              
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={onNextPage}
-                  className={`cursor-pointer ${!canGoNext ? 'opacity-50 cursor-not-allowed' : ''}`}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+        <Pagination className="mt-8">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious 
+                onClick={onPreviousPage}
+                className={`cursor-pointer ${!canGoPrevious ? 'opacity-50 pointer-events-none' : ''}`}
+              />
+            </PaginationItem>
+            {renderPaginationItems()}
+            <PaginationItem>
+              <PaginationNext 
+                onClick={onNextPage}
+                className={`cursor-pointer ${!canGoNext ? 'opacity-50 pointer-events-none' : ''}`}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
     </div>
   );

@@ -202,44 +202,38 @@ const Forums = () => {
             </div>
           )}
 
+          {/* Main Content */}
           {isLoading ? (
             <ForumLoadingSpinner />
+          ) : activeTab === 'categories' ? (
+            <CategoryList 
+              categories={updatedCategories}
+              onCategorySelect={handleCategorySelect}
+            />
           ) : (
-            <>
-              {/* Forum Categories View */}
-              {activeTab === 'categories' && (
-                <CategoryList 
-                  categories={updatedCategories}
-                  onCategorySelect={handleCategorySelect}
-                />
-              )}
-
-              {/* Recent Threads View */}
-              {activeTab === 'recent' && (
-                <ThreadList 
-                  threads={paginatedThreads}
-                  selectedCategory={selectedCategory}
-                  selectedCategoryName={getSelectedCategoryName()}
-                  canCreateThreads={canCreateThreads}
-                  canModerate={canModerate}
-                  formatTimeAgo={formatTimeAgo}
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  canGoNext={canGoNext}
-                  canGoPrevious={canGoPrevious}
-                  onNextPage={goToNext}
-                  onPreviousPage={goToPrevious}
-                  onGoToPage={goToPage}
-                />
-              )}
-            </>
+            <ThreadList 
+              threads={paginatedThreads}
+              selectedCategory={selectedCategory}
+              selectedCategoryName={getSelectedCategoryName()}
+              canCreateThreads={canCreateThreads}
+              canModerate={canModerate}
+              formatTimeAgo={formatTimeAgo}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              canGoNext={canGoNext}
+              canGoPrevious={canGoPrevious}
+              onNextPage={goToNext}
+              onPreviousPage={goToPrevious}
+              onGoToPage={goToPage}
+            />
           )}
 
-          {/* Login Prompt for Guests */}
-          {!user && <ForumGuestPrompt />}
+          {/* Guest Prompt */}
+          {!user && !isLoading && (
+            <ForumGuestPrompt />
+          )}
         </div>
       </div>
-      
       <Footer />
     </div>
   );

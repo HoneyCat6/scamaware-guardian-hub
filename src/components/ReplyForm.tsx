@@ -1,17 +1,18 @@
-
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
+import { Lock } from "lucide-react";
 
 interface ReplyFormProps {
-  onSubmit: (content: string) => Promise<void>;
+  threadId: number;
+  onReplySubmitted: () => void;
+  isThreadLocked?: boolean;
 }
 
-const ReplyForm = ({ onSubmit }: ReplyFormProps) => {
+const ReplyForm = ({ threadId, onReplySubmitted, isThreadLocked }: ReplyFormProps) => {
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
@@ -19,21 +20,12 @@ const ReplyForm = ({ onSubmit }: ReplyFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to post replies.",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    if (user.isBanned) {
+    if (isThreadLocked) {
       toast({
-        title: "Account suspended",
-        description: "Your account has been banned and cannot post replies.",
-        variant: "destructive",
+        title: "Thread is locked",
+        description: "You cannot reply to a locked thread.",
+        variant: "destructive"
       });
       return;
     }
@@ -42,105 +34,78 @@ const ReplyForm = ({ onSubmit }: ReplyFormProps) => {
       toast({
         title: "Content required",
         description: "Please enter some content for your reply.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
 
-    if (content.length > 2000) {
+    if (!user) {
       toast({
-        title: "Content too long",
-        description: "Please keep your reply under 2000 characters.",
-        variant: "destructive",
+        title: "Authentication required",
+        description: "You must be logged in to reply.",
+        variant: "destructive"
       });
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      await onSubmit(content);
+      const { error } = await supabase
+        .from("posts")
+        .insert({
+          thread_id: threadId,
+          author_id: user.id,
+          content: content.trim()
+        });
+
+      if (error) throw error;
+
       setContent("");
+      onReplySubmitted();
       toast({
         title: "Reply posted",
-        description: "Your reply has been successfully posted.",
+        description: "Your reply has been posted successfully."
       });
     } catch (error) {
+      console.error("Error posting reply:", error);
       toast({
-        title: "Error posting reply",
-        description: error instanceof Error ? error.message : "Failed to post reply. Please try again.",
-        variant: "destructive",
+        title: "Error",
+        description: "Failed to post reply. Please try again.",
+        variant: "destructive"
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!user) {
+  if (isThreadLocked) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center">
-            <p className="text-gray-600 mb-4">Please log in to post a reply.</p>
-            <Button variant="outline">
-              Log In
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (user.isBanned) {
-    return (
-      <Card className="border-red-200 bg-red-50">
-        <CardContent className="p-6">
-          <div className="text-center">
-            <p className="text-red-600 font-medium mb-2">Account Suspended</p>
-            <p className="text-red-600 text-sm">
-              Your account has been banned and cannot post replies.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 text-yellow-800">
+        <p className="flex items-center gap-2">
+          <Lock className="w-4 h-4" />
+          This thread is locked. No new replies can be added.
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="reply-content" className="block text-sm font-medium text-gray-700 mb-2">
-              Post a Reply
-            </label>
-            <Textarea
-              id="reply-content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Share your thoughts..."
-              className="min-h-[120px]"
-              disabled={isSubmitting}
-            />
-            <div className="flex justify-between items-center mt-2">
-              <span className="text-sm text-gray-500">
-                {content.length}/2000 characters
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex justify-end">
-            <Button 
-              type="submit" 
-              disabled={isSubmitting || !content.trim()}
-              className="flex items-center gap-2"
-            >
-              <Send className="w-4 h-4" />
-              {isSubmitting ? "Posting..." : "Post Reply"}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="Write your reply..."
+        className="min-h-[100px]"
+        disabled={isSubmitting}
+      />
+      <Button
+        type="submit"
+        disabled={isSubmitting || !content.trim()}
+        className="flex items-center gap-1"
+      >
+        {isSubmitting ? "Posting..." : "Post Reply"}
+      </Button>
+    </form>
   );
 };
 

@@ -11,37 +11,21 @@ type Post = Database["public"]["Tables"]["posts"]["Row"] & {
 };
 
 interface PostEditFormProps {
-  post: Post;
-  onSave: (content: string) => Promise<void>;
+  initialContent: string;
+  onSave: (content: string) => void;
   onCancel: () => void;
-  isLoading?: boolean;
 }
 
-const PostEditForm = ({ post, onSave, onCancel, isLoading }: PostEditFormProps) => {
-  const [content, setContent] = useState(post.content);
+const PostEditForm = ({ initialContent, onSave, onCancel }: PostEditFormProps) => {
+  const [content, setContent] = useState(initialContent);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!content.trim()) return;
 
-    if (!content.trim()) {
-      toast({
-        title: "Content required",
-        description: "Please enter some content for your post.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (content.length > 10000) {
-      toast({
-        title: "Content too long",
-        description: "Please keep your post under 10,000 characters.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    setIsSaving(true);
     try {
       await onSave(content);
     } catch (error) {
@@ -50,6 +34,8 @@ const PostEditForm = ({ post, onSave, onCancel, isLoading }: PostEditFormProps) 
         description: error instanceof Error ? error.message : "Failed to save post. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -66,8 +52,8 @@ const PostEditForm = ({ post, onSave, onCancel, isLoading }: PostEditFormProps) 
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Edit your post..."
-              className="min-h-[120px]"
-              disabled={isLoading}
+              className="min-h-[100px]"
+              disabled={isSaving}
             />
             <div className="flex justify-between items-center mt-2">
               <span className="text-sm text-gray-500">
@@ -81,7 +67,7 @@ const PostEditForm = ({ post, onSave, onCancel, isLoading }: PostEditFormProps) 
               type="button" 
               variant="outline"
               onClick={onCancel}
-              disabled={isLoading}
+              disabled={isSaving}
               className="flex items-center gap-2"
             >
               <X className="w-4 h-4" />
@@ -89,9 +75,9 @@ const PostEditForm = ({ post, onSave, onCancel, isLoading }: PostEditFormProps) 
             </Button>
             <Button 
               type="submit" 
-              disabled={isLoading || !content.trim() || content === post.content}
+              disabled={isSaving || !content.trim()}
             >
-              {isLoading ? "Saving..." : "Save Changes"}
+              {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>

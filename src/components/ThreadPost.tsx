@@ -5,7 +5,6 @@ import PostHeader from "@/components/PostHeader";
 import PostActions from "@/components/PostActions";
 import PostContent from "@/components/PostContent";
 import PostEditForm from "@/components/PostEditForm";
-import ReportedPostAlert from "@/components/ReportedPostAlert";
 import type { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -26,37 +25,7 @@ const ThreadPost = ({ post, onDelete, onEdit, canModerate, isAuthor }: ThreadPos
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tablesExist, setTablesExist] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-
-  // Check if tables exist
-  useEffect(() => {
-    const checkTables = async () => {
-      try {
-        // Check post_likes table
-        const { error: likesError } = await supabase.from('post_likes').select('*').limit(1);
-        // Check post_reports table
-        const { error: reportsError } = await supabase.from('post_reports').select('*').limit(1);
-
-        if (likesError || reportsError) {
-          console.error('Tables not found:', { likesError, reportsError });
-          setTablesExist(false);
-          toast({
-            title: "Database setup required",
-            description: "Please contact an administrator to set up the required database tables.",
-            variant: "destructive",
-          });
-        } else {
-          setTablesExist(true);
-        }
-      } catch (err) {
-        console.error('Error checking tables:', err);
-        setTablesExist(false);
-      }
-    };
-
-    checkTables();
-  }, [toast]);
 
   const handleEditStart = () => {
     setIsEditing(true);
@@ -127,10 +96,8 @@ const ThreadPost = ({ post, onDelete, onEdit, canModerate, isAuthor }: ThreadPos
   }
 
   return (
-    <Card className={`${isLoading ? 'opacity-50' : ''} ${post.is_reported && canModerate ? 'border-orange-300 bg-orange-50' : ''}`}>
+    <Card className={isLoading ? 'opacity-50' : ''}>
       <CardContent className="p-6">
-        <ReportedPostAlert post={post} canModerate={canModerate} />
-
         <div className="flex items-start justify-between mb-4">
           <PostHeader post={post} />
           <PostActions 
@@ -140,18 +107,18 @@ const ThreadPost = ({ post, onDelete, onEdit, canModerate, isAuthor }: ThreadPos
             isLoading={isLoading}
             canModerate={canModerate}
             isAuthor={isAuthor}
+            isDeleting={false}
           />
         </div>
         
         {isEditing ? (
           <PostEditForm
-            post={post}
+            initialContent={post.content}
             onSave={handleEditSave}
             onCancel={handleEditCancel}
-            isLoading={isLoading}
           />
         ) : (
-          <PostContent post={post} />
+          <PostContent content={post.content} />
         )}
       </CardContent>
     </Card>

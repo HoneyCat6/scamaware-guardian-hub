@@ -1,4 +1,4 @@
-import { ThumbsUp, Flag, MoreVertical, Trash2, Edit } from "lucide-react";
+import { ThumbsUp, Flag, MoreVertical, Trash2, Edit, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Database } from "@/integrations/supabase/types";
@@ -18,14 +18,14 @@ interface PostActionsProps {
   isLoading: boolean;
   canModerate?: boolean;
   isAuthor?: boolean;
+  isDeleting: boolean;
 }
 
-const PostActions = ({ post, onDelete, onEdit, isLoading, canModerate, isAuthor }: PostActionsProps) => {
+const PostActions = ({ post, onDelete, onEdit, isLoading, canModerate, isAuthor, isDeleting }: PostActionsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [isReported, setIsReported] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [tablesExist, setTablesExist] = useState(false);
 
@@ -38,11 +38,9 @@ const PostActions = ({ post, onDelete, onEdit, isLoading, canModerate, isAuthor 
       try {
         // Check post_likes table
         const { error: likesError } = await supabase.from('post_likes').select('*').limit(1);
-        // Check post_reports table
-        const { error: reportsError } = await supabase.from('post_reports').select('*').limit(1);
 
-        if (likesError || reportsError) {
-          console.error('Tables not found:', { likesError, reportsError });
+        if (likesError) {
+          console.error('Tables not found:', { likesError });
           setTablesExist(false);
           toast({
             title: "Database setup required",
@@ -100,33 +98,6 @@ const PostActions = ({ post, onDelete, onEdit, isLoading, canModerate, isAuthor 
     };
 
     fetchLikeStatus();
-  }, [post.id, user, tablesExist]);
-
-  // Fetch initial report status
-  useEffect(() => {
-    const fetchReportStatus = async () => {
-      if (!user || !tablesExist) return;
-
-      try {
-        const { data: reportData, error: reportError } = await supabase
-          .from("post_reports")
-          .select()
-          .eq("post_id", post.id)
-          .eq("user_id", user.id)
-          .single();
-
-        if (reportError && reportError.code !== "PGRST116") {
-          console.error("Error fetching report status:", reportError);
-          return;
-        }
-
-        setIsReported(!!reportData);
-      } catch (err) {
-        console.error("Error in fetchReportStatus:", err);
-      }
-    };
-
-    fetchReportStatus();
   }, [post.id, user, tablesExist]);
 
   const handleLike = async () => {
@@ -199,76 +170,6 @@ const PostActions = ({ post, onDelete, onEdit, isLoading, canModerate, isAuthor 
     }
   };
 
-  const handleReport = async () => {
-    if (!user) {
-      toast({
-        title: "Login required",
-        description: "Please log in to report posts.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!tablesExist) {
-      toast({
-        title: "Database setup required",
-        description: "Please contact an administrator to set up the required database tables.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isReported) {
-      toast({
-        title: "Already reported",
-        description: "You have already reported this post.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-
-      // Add report record
-      const { error: reportError } = await supabase
-        .from("post_reports")
-        .insert({
-          post_id: post.id,
-          user_id: user.id
-        });
-
-      if (reportError) throw reportError;
-
-      // Update post report count
-      const { error: updateError } = await supabase
-        .from("posts")
-        .update({
-          is_reported: true,
-          report_count: post.report_count + 1
-        })
-        .eq("id", post.id);
-
-      if (updateError) throw updateError;
-
-      setIsReported(true);
-
-      toast({
-        title: "Post reported",
-        description: "Thank you for reporting this post. Our moderators will review it.",
-      });
-    } catch (err) {
-      console.error("Error handling report:", err);
-      toast({
-        title: "Error",
-        description: "Failed to report post. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleEdit = () => {
     if (!canEdit) {
       toast({
@@ -334,16 +235,6 @@ const PostActions = ({ post, onDelete, onEdit, isLoading, canModerate, isAuthor 
         <span>{likeCount}</span>
       </Button>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        className={`flex items-center gap-1 ${isReported ? 'text-red-500' : ''}`}
-        onClick={handleReport}
-        disabled={isLoading || actionLoading || isReported || !tablesExist}
-      >
-        <Flag className="w-4 h-4" />
-      </Button>
-
       {(canEdit || canDelete) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -360,8 +251,8 @@ const PostActions = ({ post, onDelete, onEdit, isLoading, canModerate, isAuthor 
             )}
             {canDelete && (
               <DropdownMenuItem onClick={handleDelete} className="text-red-500">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
+                <Trash2 className={`w-4 h-4 ${isDeleting ? 'animate-spin' : ''}`} />
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

@@ -5,13 +5,13 @@ type Post = Database["public"]["Tables"]["posts"]["Row"] & {
 };
 
 interface PostContentProps {
-  post: Post;
+  content: string;
 }
 
-const PostContent = ({ post }: PostContentProps) => {
+const PostContent = ({ content }: PostContentProps) => {
   return (
-    <div className="prose max-w-none">
-      <p className="text-gray-700 leading-relaxed">{post.content}</p>
+    <div className="mt-2 text-gray-700 whitespace-pre-wrap break-words">
+      {content}
     </div>
   );
 };

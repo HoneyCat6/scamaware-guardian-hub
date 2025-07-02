@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 import type { Database } from "@/integrations/supabase/types";
 
 type DatabaseThread = Database["public"]["Tables"]["threads"]["Row"];
+type DatabasePost = Database["public"]["Tables"]["posts"]["Row"];
 
 interface Thread extends DatabaseThread {
   author: { username: string };
-  posts: { count: number }[];
+  posts: DatabasePost[];
+  last_post_at?: string;
+  is_reported?: boolean;
 }
 
 interface ThreadCardProps {
@@ -56,11 +59,11 @@ const ThreadCard = ({ thread, canModerate, formatTimeAgo }: ThreadCardProps) => 
               </div>
               <div className="flex items-center gap-1">
                 <MessageSquare className="w-4 h-4" />
-                <span>{thread.posts[0]?.count || 0} {thread.posts[0]?.count === 1 ? 'reply' : 'replies'}</span>
+                <span>{thread.posts.length} {thread.posts.length === 1 ? 'reply' : 'replies'}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="w-4 h-4" />
-                <span>{formatTimeAgo(thread.created_at)}</span>
+                <span>{formatTimeAgo(thread.last_post_at || thread.created_at)}</span>
               </div>
             </div>
           </div>

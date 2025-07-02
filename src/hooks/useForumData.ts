@@ -1,109 +1,156 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { useAuth } from "./useAuth";
 
 type DatabaseThread = Database["public"]["Tables"]["threads"]["Row"];
+type DatabasePost = Database["public"]["Tables"]["posts"]["Row"];
 type DatabaseCategory = Database["public"]["Tables"]["categories"]["Row"];
 
-interface Thread extends DatabaseThread {
-  author: { username: string };
-  posts: { count: number }[];
+interface ThreadAuthor {
+  username: string;
+}
+
+export interface Thread extends DatabaseThread {
+  author: ThreadAuthor;
+  posts: DatabasePost[];
   last_post_at?: string;
   is_reported?: boolean;
 }
 
-interface Category extends DatabaseCategory {
+export interface Post extends DatabasePost {
+  author: {
+    username: string;
+  };
+}
+
+export interface Category extends DatabaseCategory {
   threads: number;
   posts: number;
 }
 
-export const useForumData = (selectedCategory: number | null, searchQuery: string) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export const useForumData = (selectedCategory: number | null = null, searchQuery: string = "") => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
-  // Fetch categories and threads
   useEffect(() => {
-    const fetchForumData = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        // Fetch categories
         const { data: categoriesData, error: categoriesError } = await supabase
           .from("categories")
           .select("*")
           .order("id");
 
-        if (categoriesError) {
-          console.error("Error fetching categories:", categoriesError);
-          throw new Error("Failed to fetch categories");
-        }
+        if (categoriesError) throw categoriesError;
 
-        // Fetch threads with author and post count
         const { data: threadsData, error: threadsError } = await supabase
           .from("threads")
           .select(`
             *,
             author:profiles(username),
-            posts(count)
+            posts:posts(*)
           `)
           .order("is_pinned", { ascending: false })
           .order("created_at", { ascending: false });
 
-        if (threadsError) {
-          console.error("Error fetching threads:", threadsError);
-          throw new Error("Failed to fetch threads");
-        }
+        if (threadsError) throw threadsError;
 
-        setCategories(categoriesData || []);
-        setThreads(threadsData || []);
+        // Transform the data to match our interfaces
+        const transformedCategories = (categoriesData || []).map((category) => ({
+          ...category,
+          threads: 0,
+          posts: 0
+        }));
+
+        const transformedThreads = (threadsData || []).map((thread) => {
+          const threadPosts = Array.isArray(thread.posts) ? thread.posts : [];
+          const authorData = typeof thread.author === 'object' && thread.author !== null 
+            ? thread.author as unknown as { username: string } 
+            : null;
+          return {
+            ...thread,
+            author: {
+              username: authorData?.username || "Unknown"
+            },
+            posts: threadPosts,
+            last_post_at: threadPosts.length 
+              ? threadPosts[threadPosts.length - 1].created_at 
+              : thread.created_at,
+            is_reported: false
+          };
+        });
+
+        setCategories(transformedCategories);
+        setThreads(transformedThreads);
       } catch (err) {
-        console.error("Forum data fetch error:", err);
-        setError(err instanceof Error ? err.message : "An error occurred while fetching forum data");
+        console.error("Error fetching forum data:", err);
+        setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchForumData();
+    fetchData();
 
     // Set up real-time subscription for threads
     const threadsSubscription = supabase
-      .channel("threads-changes")
+      .channel('threads-channel')
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "*",
-          schema: "public",
-          table: "threads"
+          event: '*',
+          schema: 'public',
+          table: 'threads'
         },
         async (payload) => {
           try {
-            // For inserts and updates, fetch the complete thread data with relations
-            if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-              const { data: threadData, error: threadError } = await supabase
+            if (payload.eventType === "INSERT") {
+              // Fetch the complete thread data with author and posts
+              const { data: newThread, error: threadError } = await supabase
                 .from("threads")
                 .select(`
                   *,
                   author:profiles(username),
-                  posts(count)
+                  posts:posts(*)
                 `)
                 .eq("id", payload.new.id)
                 .single();
 
               if (threadError) throw threadError;
 
-              setThreads(currentThreads => {
-                if (payload.eventType === "INSERT") {
-                  return [threadData, ...currentThreads];
-                } else {
-                  return currentThreads.map(thread =>
-                    thread.id === threadData.id ? threadData : thread
-                  );
-                }
-              });
+              // Transform the new thread
+              const threadPosts = Array.isArray(newThread.posts) ? newThread.posts : [];
+              const authorData = typeof newThread.author === 'object' && newThread.author !== null 
+                ? newThread.author as unknown as { username: string } 
+                : null;
+
+              const transformedThread: Thread = {
+                ...newThread,
+                author: {
+                  username: authorData?.username || "Unknown"
+                },
+                posts: threadPosts,
+                last_post_at: threadPosts.length 
+                  ? threadPosts[threadPosts.length - 1].created_at 
+                  : newThread.created_at,
+                is_reported: false
+              };
+
+              setThreads(currentThreads => [transformedThread, ...currentThreads]);
+            } else if (payload.eventType === "UPDATE") {
+              setThreads(currentThreads =>
+                currentThreads.map(thread =>
+                  thread.id === payload.new.id
+                    ? { ...thread, ...payload.new }
+                    : thread
+                )
+              );
             } else if (payload.eventType === "DELETE") {
               setThreads(currentThreads =>
                 currentThreads.filter(thread => thread.id !== payload.old.id)
@@ -121,14 +168,46 @@ export const useForumData = (selectedCategory: number | null, searchQuery: strin
     };
   }, []);
 
-  // Calculate updated categories with thread and post counts
+  const addThread = (newThread: Thread) => {
+    setThreads((currentThreads) => [
+      ...currentThreads,
+      {
+        ...newThread,
+        posts: newThread.posts || [],
+        last_post_at: newThread.created_at,
+        is_reported: false
+      }
+    ]);
+  };
+
+  const updateThread = (updatedThread: Thread) => {
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) =>
+        thread.id === updatedThread.id
+          ? {
+              ...updatedThread,
+              posts: updatedThread.posts || thread.posts,
+              last_post_at: updatedThread.posts?.length
+                ? updatedThread.posts[updatedThread.posts.length - 1].created_at
+                : updatedThread.created_at,
+              is_reported: updatedThread.is_reported || false
+            }
+          : thread
+      )
+    );
+  };
+
+  const deleteThread = (threadId: number) => {
+    setThreads((currentThreads) =>
+      currentThreads.filter((thread) => thread.id !== threadId)
+    );
+  };
+
+  // Calculate statistics
   const updatedCategories = useMemo(() => {
     return categories.map(category => {
       const categoryThreads = threads.filter(thread => thread.category_id === category.id);
-      const categoryPosts = categoryThreads.reduce((total, thread) => 
-        total + (thread.posts?.[0]?.count || 0), 0
-      );
-      
+      const categoryPosts = categoryThreads.reduce((total, thread) => total + thread.posts.length, 0);
       return {
         ...category,
         threads: categoryThreads.length,
@@ -137,20 +216,9 @@ export const useForumData = (selectedCategory: number | null, searchQuery: strin
     });
   }, [categories, threads]);
 
-  // Calculate totals
   const totalThreads = threads.length;
-  const totalPosts = threads.reduce((total, thread) => 
-    total + (thread.posts?.[0]?.count || 0), 0
-  );
-
-  // Calculate active threads (threads with posts in the last 24 hours)
-  const activeThreads = threads.filter(thread => {
-    const lastPostTime = thread.last_post_at || thread.created_at;
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return new Date(lastPostTime) > twentyFourHoursAgo;
-  }).length;
-
-  // Calculate reported threads
+  const totalPosts = threads.reduce((total, thread) => total + thread.posts.length, 0);
+  const activeThreads = threads.filter(thread => !thread.is_locked).length;
   const reportedThreads = threads.filter(thread => thread.is_reported).length;
 
   // Filter threads by selected category and search query
@@ -164,7 +232,7 @@ export const useForumData = (selectedCategory: number | null, searchQuery: strin
       filtered = filtered.filter(thread =>
         thread.title.toLowerCase().includes(query) ||
         thread.content.toLowerCase().includes(query) ||
-        thread.author?.username.toLowerCase().includes(query)
+        thread.author.username.toLowerCase().includes(query)
       );
     }
 
@@ -172,13 +240,18 @@ export const useForumData = (selectedCategory: number | null, searchQuery: strin
   }, [selectedCategory, searchQuery, threads]);
 
   return {
+    categories: updatedCategories,
+    threads,
+    isLoading,
+    error,
+    addThread,
+    updateThread,
+    deleteThread,
     updatedCategories,
     totalThreads,
     totalPosts,
     activeThreads,
     reportedThreads,
-    filteredThreads,
-    isLoading,
-    error
+    filteredThreads
   };
 };
