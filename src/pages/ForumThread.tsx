@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Thread, Post } from "@/types/forum";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const ForumThread = () => {
   const { id } = useParams();
@@ -27,6 +28,10 @@ const ForumThread = () => {
   const [showModerationPanel, setShowModerationPanel] = useState(false);
   const [thread, setThread] = useState<Thread | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [editMode, setEditMode] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Convert string id to number
   const threadId = id ? parseInt(id, 10) : null;
@@ -376,6 +381,51 @@ const ForumThread = () => {
     };
   }, [threadId]);
 
+  // Helper: is the current user the thread author?
+  const isThreadAuthor = user && thread && user.id === thread.author_id;
+
+  // Edit handlers
+  const handleStartEdit = () => {
+    setEditTitle(thread.title);
+    setEditContent(thread.content);
+    setEditMode(true);
+  };
+  const handleCancelEdit = () => {
+    setEditMode(false);
+  };
+  const handleSaveEdit = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from("threads")
+        .update({ title: editTitle, content: editContent, updated_at: new Date().toISOString() })
+        .eq("id", thread.id);
+      if (error) throw error;
+      setThread({ ...thread, title: editTitle, content: editContent });
+      setEditMode(false);
+      toast({ title: "Thread updated", description: "Your thread has been updated." });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to update thread.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // Delete handler
+  const handleDeleteThread = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.from("threads").delete().eq("id", thread.id);
+      if (error) throw error;
+      toast({ title: "Thread deleted", description: "Your thread has been deleted." });
+      window.location.href = "/forums";
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to delete thread.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
   if (!threadId) {
     return <InvalidThreadId />;
   }
@@ -419,6 +469,47 @@ const ForumThread = () => {
           {/* Thread header */}
           <ThreadHeader thread={thread} />
 
+          {/* Edit/Delete controls for thread author */}
+          {isThreadAuthor && !editMode && (
+            <div className="flex gap-2 mb-4">
+              <Button variant="outline" size="sm" onClick={handleStartEdit}>Edit</Button>
+              <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>Delete</Button>
+            </div>
+          )}
+
+          {/* Inline edit form */}
+          {isThreadAuthor && editMode && (
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <div className="mb-4">
+                <input
+                  className="w-full border rounded px-3 py-2 mb-2 text-lg font-bold"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  disabled={isLoading}
+                />
+                <textarea
+                  className="w-full border rounded px-3 py-2 min-h-[120px]"
+                  value={editContent}
+                  onChange={e => setEditContent(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveEdit} disabled={isLoading}>Save</Button>
+                <Button variant="outline" onClick={handleCancelEdit} disabled={isLoading}>Cancel</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Thread content (view mode) */}
+          {!editMode && (
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <div className="prose max-w-none">
+                {thread.content}
+              </div>
+            </div>
+          )}
+
           {/* Moderator controls */}
           {canModerate && (
             <ModeratorControls
@@ -430,13 +521,6 @@ const ForumThread = () => {
               onThreadUpdate={handleThreadUpdate}
             />
           )}
-
-          {/* Thread content */}
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="prose max-w-none">
-              {thread.content}
-            </div>
-          </div>
 
           {/* Posts */}
           <div className="space-y-6">
@@ -462,6 +546,20 @@ const ForumThread = () => {
               />
             </div>
           )}
+
+          {/* Delete confirmation dialog */}
+          <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Thread</DialogTitle>
+              </DialogHeader>
+              <p>Are you sure you want to delete this thread? This action cannot be undone.</p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isLoading}>Cancel</Button>
+                <Button variant="destructive" onClick={handleDeleteThread} disabled={isLoading}>Delete</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </main>
 

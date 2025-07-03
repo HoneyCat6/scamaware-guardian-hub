@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 type Article = Database["public"]["Tables"]["articles"]["Row"];
 
@@ -297,9 +298,18 @@ const News = () => {
                       </div>
                     )}
                   </div>
-                  <p className="text-gray-600 mb-4 line-clamp-3">
-                    {article.excerpt}
-                  </p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <p className="text-gray-600 mb-4 line-clamp-3 cursor-pointer" title="Show full excerpt">
+                        {article.excerpt}
+                      </p>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="center" className="max-w-md w-full">
+                      <div className="text-gray-800 whitespace-pre-line">
+                        {article.excerpt}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
                     <span>
                       {article.author ? `By ${article.author}` : 'Anonymous'}
